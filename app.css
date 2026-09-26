@@ -1,0 +1,752 @@
+/* Warsaw Flats — прототип нового интерфейса.
+   Роли-переменные, а не сырые hex: светлая/тёмная тема меняются в одном месте.
+   Значения — из проверенной палитры (см. dataviz/references/palette.md);
+   контраст к обеим поверхностям ≥3:1 проверен. */
+
+:root {
+  color-scheme: light;
+  --surface:        #fcfcfb;   /* карточки, панели */
+  --plane:          #f4f4f1;   /* фон страницы, под карточками */
+  --line:           #e3e2dd;
+  --ink:            #0b0b0b;
+  --ink-2:          #52514e;   /* вторичный текст */
+  /* Аудит a11y-18: #86857f давал 3.61:1 на --surface и 3.36:1 на --plane —
+     ниже нормы AA 4.5:1 для мелкого текста (.filters label 12px, .count
+     13px, .facts dt 12.5px, .rrow 12px и др.). Тот же приём, что у a11y-19
+     (--good/--bad) — темнее, посчитано программно под обе поверхности. */
+  --ink-3:          #71706b;   /* подписи, единицы — 4.83:1/4.5:1 на surface/plane */
+  --accent:         #2a78d6;   /* шкалы осей: одна величина — один hue */
+  --accent-soft:    #cde2fb;   /* дорожка шкалы */
+  /* Акцент для ТЕКСТА. Отдельно от --accent: тот подобран для заливок и на
+     светлом фоне даёт 4.30:1 — ниже нормы 4.5 для мелкого текста.
+     Здесь на шаг темнее (5.26:1), в тёмной теме наоборот светлее (4.79:1). */
+  --accent-ink:     #256abf;
+  /* Заливка выбранных состояний (вкладка, чип, раскрытая панель). Тоже
+     отдельно от --accent: белый текст на нём даёт 4.42:1 в светлой теме и
+     3.64:1 в тёмной — ниже нормы. На этом шаге 5.39:1 в обеих. */
+  --accent-fill:    #256abf;
+  /* Аудит a11y-19: --good/--bad не были переопределены в тёмной теме —
+     значения ниже подобраны отдельно под каждую пару поверхностей (surface/
+     plane), тот же приём, что уже применён к --accent-ink/--accent-fill выше.
+     Заодно у САМОГО --good нашёлся отдельный, не связанный с темой изъян:
+     #0ca30c даёт 3.27:1 на светлом --surface — ниже нормы 4.5:1 для мелкого
+     текста (.fair.good 11.5px, .cmp-best 12.5px) независимо от темы; сюда
+     взята более тёмная версия. --bad на светлом уже был ок по --surface
+     (4.68:1), но на --plane — 4.36:1, тоже чуть ниже нормы; тоже подтянут. */
+  --good:           #087a08;   /* дешевле рынка — 5.39:1/5.02:1 на surface/plane */
+  --bad:            #c03030;   /* дороже рынка — 5.52:1/5.14:1 на surface/plane */
+  /* высота шапки + полосы фильтров: под ними начинается шторка */
+  --chrome-h:       88px;
+  --radius:         10px;
+  --shadow:         0 1px 3px rgba(0,0,0,.07), 0 6px 20px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface: #1a1a19; --plane: #0d0d0d; --line: #333330;
+    --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8b8a81;
+    --accent: #3987e5; --accent-soft: #184f95; --accent-ink: #3987e5; --accent-fill: #256abf;
+    /* --good/--bad светлой темы (#087a08/#c03030) слишком тёмные для тёмного
+       фона — 3.15:1/5.?:1, первое ниже нормы. Свои значения под тёмные
+       surface/plane (аудит a11y-19). */
+    --good: #16cc16; --bad: #e06060;
+    --shadow: 0 1px 3px rgba(0,0,0,.5), 0 6px 20px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #1a1a19; --plane: #0d0d0d; --line: #333330;
+  --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8b8a81;
+  --accent: #3987e5; --accent-soft: #184f95; --accent-ink: #3987e5; --accent-fill: #256abf;
+  --good: #16cc16; --bad: #e06060;
+  --shadow: 0 1px 3px rgba(0,0,0,.5), 0 6px 20px rgba(0,0,0,.4);
+}
+
+* { box-sizing: border-box; }
+/* Страница не должна ездить вбок ни при какой ширине: смотреть там нечего,
+   а на телефоне это читается как поломка. Переполнение шапки чиним по месту
+   (ниже), а это — страховка на случай, если что-то ещё вылезет за край. */
+html, body { height: 100%; max-width: 100%; overflow-x: hidden; }
+body {
+  margin: 0; background: var(--plane); color: var(--ink);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  display: flex; flex-direction: column;
+}
+
+/* ── Шапка ───────────────────────────────────────────────────────────────── */
+.top {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand-home {
+  font: inherit; font-size: 15px; font-weight: 700; letter-spacing: .2px;
+  color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer; border-radius: 4px;
+}
+.brand-home:hover { color: var(--accent-ink); }
+.brand-home:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 3px; }
+.count { color: var(--ink-3); font-size: 13px; white-space: nowrap; }
+.top-right { display: flex; align-items: center; gap: 10px; }
+.sort { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 13px; }
+
+select, input[type=number] {
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 7px; font: inherit; font-size: 13px;
+}
+input[type=number] { width: 76px; }
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+.ghost {
+  background: var(--surface); color: var(--ink-2); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.ghost:hover { border-color: var(--ink-3); color: var(--ink); }
+/* Кнопка «Фильтры» выглядит ровно как НЕвыбранная вкладка. Никакой подсветки:
+   заливка в этой шапке означает «этот раздел открыт» и принадлежит вкладкам
+   «Список»/«Карта». Отмечать ею ещё и наличие активных фильтров — значит
+   давать одному приёму два несовместимых смысла. */
+#flt-toggle {
+  background: var(--surface); color: var(--ink-2);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 5px 12px; font-size: 13px;
+}
+#flt-toggle:hover { border-color: var(--ink-3); color: var(--ink); }
+/* Раскрытая панель = выбранный раздел, вид ровно как у активной вкладки */
+#flt-toggle[aria-expanded="true"] {
+  background: var(--accent-fill); border-color: var(--accent-fill); color: #fff;
+}
+
+/* ── Фильтры: компактная строка (пилюли) + чипы активных + полная панель ────
+   Было: одна открытая полоса лейблов. Стало (аудит 2026-09-22, макет Design):
+   3 «быстрых» пилюли со своими поповерами (Цена/Комнаты/Район, переиспользуют
+   те же #f-pmin.. и т.д.) + «Ещё фильтры N» → полная панель секциями + чипы
+   активных фильтров под строкой. На телефоне поповеров нет — всё содержимое
+   идёт одной лентой секций внутри той же полноэкранной шторки, что и раньше
+   (см. @media ниже). */
+.filters {
+  display: flex; flex-direction: column; position: relative;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+/* Заголовок панели нужен только на телефоне, где она открывается поверх экрана */
+.flt-head { display: none; }
+
+.flt-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 9px 16px; }
+.flt-spacer { flex: 1; }
+.reset-link {
+  background: none; border: none; color: var(--ink-3); font: inherit; font-size: 12px;
+  cursor: pointer; text-decoration: underline;
+}
+.reset-link:hover { color: var(--ink-2); }
+.btn-primary {
+  background: var(--accent-fill); color: #fff; border: none; border-radius: 8px;
+  padding: 9px 18px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn-primary:hover { filter: brightness(1.06); }
+
+/* Пилюли: Цена / Комнаты / Район / «Ещё фильтры» */
+.pop { position: relative; }
+.pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 999px; padding: 7px 12px 7px 14px; font: inherit; font-size: 13px; cursor: pointer;
+  white-space: nowrap;
+}
+.pill:hover { border-color: var(--ink-3); }
+.pill[aria-expanded="true"] { border-color: var(--accent); }
+.pill-val { color: var(--accent-ink); font-weight: 600; }
+.pill-car { color: var(--ink-3); font-size: 11px; }
+.pill-more { border-color: var(--line); color: var(--ink-2); }
+.pill-more.pill-on, .pill-more[aria-expanded="true"] {
+  background: var(--accent-fill); border-color: var(--accent-fill); color: #fff;
+}
+.pill-more.pill-on .pill-badge, .pill-more[aria-expanded="true"] .pill-badge {
+  background: #fff; color: var(--accent-ink);
+}
+.pill-badge {
+  background: var(--accent-fill); color: #fff; border-radius: 999px;
+  font-size: 11px; font-weight: 700; padding: 1px 7px; min-width: 16px; text-align: center;
+}
+
+/* Поповеры пилюль — тот же приём, что у .axf-box (плавающая карточка) */
+.pop-box {
+  position: absolute; z-index: 900; top: calc(100% + 6px); left: 0;
+  min-width: 220px; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.pop-box-wide { min-width: 260px; }
+.pop-box[hidden] { display: none; }
+
+/* Активные фильтры — чипами, с крестиком на каждом */
+.flt-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; }
+.flt-chips[hidden] { display: none; }
+.achip {
+  display: flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); background: var(--plane); color: var(--ink-2);
+  border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 12px;
+}
+.achip button {
+  border: 0; background: none; color: var(--ink-3); font-size: 13px; line-height: 1;
+  cursor: pointer; padding: 2px;
+}
+.achip button:hover { color: var(--ink); }
+
+/* Полная панель фильтров: пристыкована к колонке списка (та же ширина, тот же
+   левый край), а не произвольная плавающая карточка — иначе она визуально
+   не «принадлежала» ни списку, ни фильтрам сверху. Верхние углы не скруглены —
+   она встык продолжает полосу фильтров, а не парит отдельно от неё. */
+.flt-panel {
+  position: absolute; z-index: 900; top: 100%; left: 0;
+  width: var(--list-w, 380px); max-height: min(78vh, 700px);
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-top: none;
+  border-radius: 0 0 12px 12px; box-shadow: var(--shadow); overflow: hidden;
+}
+.flt-panel[hidden] { display: none; }
+.flt-panel-body { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 20px; }
+.flt-panel-foot {
+  flex: 0 0 auto; border-top: 1px solid var(--line); padding: 12px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+/* «Быстрые» — домашняя секция для полей Цены/Комнат только на телефоне
+   (на десктопе те же поля живут в поповерах пилюль, см. moveQuickFields в app.js) */
+#fgrp-quick { display: none; }
+
+.fgrp-t {
+  margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--ink-2);
+}
+.field-label { display: block; font-size: 12px; color: var(--ink-2); margin: 10px 0 6px; }
+.field-label:first-of-type { margin-top: 0; }
+.fld-row { display: flex; gap: 8px; }
+.fld { flex: 1; min-width: 0; }
+.fld > span { display: block; font-size: 11px; color: var(--ink-2); margin-bottom: 3px; }
+.fld-narrow { max-width: 120px; }
+
+.dist-list {
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+}
+.dist-list label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); cursor: pointer; }
+
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-2);
+  border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer; user-select: none;
+}
+.chip[aria-pressed="true"] { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
+
+/* ── Профиль (шапка): избранное/скрытые вместо ряда тегов ─────────────────── */
+.profile { position: relative; }
+.profile-btn { position: relative; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 50%; }
+.profile-btn[aria-expanded="true"] {
+  border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink);
+}
+.profile-dot {
+  position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent-fill); border: 2px solid var(--surface);
+}
+.profile-dot[hidden] { display: none; }
+.profile-menu {
+  position: absolute; z-index: 1000; top: 40px; right: 0; width: 236px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--shadow); padding: 6px; display: flex; flex-direction: column; gap: 2px;
+}
+.profile-menu[hidden] { display: none; }
+.profile-menu-head {
+  padding: 8px 10px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px;
+  font-size: 12px; color: var(--ink-2);
+}
+.menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: 0; background: none; border-radius: 6px; padding: 9px 10px;
+  font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; text-align: left;
+}
+.menu-item:hover { background: var(--plane); }
+.menu-item[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.menu-item-label { flex: 1; }
+.menu-badge {
+  font-size: 11px; font-weight: 600; color: var(--ink-2); background: var(--plane);
+  border-radius: 999px; padding: 1px 8px;
+}
+.menu-badge[hidden] { display: none; }
+.menu-divider { border-top: 1px solid var(--line); margin: 4px 4px 2px; }
+.menu-item-soon { color: var(--ink-3); cursor: default; }
+.menu-item-soon:hover { background: none; }
+.menu-badge-soon { color: var(--ink-3); }
+
+/* ── Раскладка: список + карта ───────────────────────────────────────────── */
+/* Ширина списка — переменная: её меняет перетаскивание разделителя, значение
+   переживает перезагрузку. 380px по умолчанию вместо прежних 44% экрана:
+   на широком мониторе список занимал половину площади. */
+.split {
+  flex: 1; display: grid;
+  grid-template-columns: var(--list-w, 380px) 6px 1fr;
+  min-height: 0;
+}
+/* Разделитель. Плавный переход только на сворачивании — при перетаскивании
+   он бы «догонял» курсор с задержкой */
+body.animating .split { transition: grid-template-columns .2s ease; }
+
+.gutter {
+  cursor: col-resize; background: var(--line);
+  border-left: 1px solid var(--surface); border-right: 1px solid var(--surface);
+}
+.gutter:hover, .gutter:focus-visible, body.dragging .gutter { background: var(--accent); }
+body.dragging { cursor: col-resize; user-select: none; }
+/* Свёрнутый список: колонка схлопывается в ноль, карта занимает всё.
+   Именно grid-колонка, а не display:none — так переход плавный, а состояние
+   прокрутки и уже отрисованные карточки не теряются. */
+/* Разделитель НЕ убираем из потока при сворачивании: он элемент сетки, и
+   display:none оставил бы 2 элемента на 3 объявленные колонки — карта получала
+   нулевую и исчезала. Схлопываем шириной, а не удалением. */
+body.collapsed .split { grid-template-columns: 0 0 1fr; }
+body.collapsed .gutter { pointer-events: none; }
+body.collapsed .list-col { overflow: hidden; }
+body.collapsed .list { padding: 0; }
+body.collapsed .list-head { padding: 0; border-color: transparent; }
+body.collapsed .map-wrap { border-left: none; }
+/* Список получил свою строку-заголовок (сортировка) над карточками — раньше
+   .list была прямым grid-ребёнком .split, теперь это .list-col (колонка
+   .list-head + .list), а .list только скроллится внутри неё. */
+/* min-width: 0 обязателен: у grid-детей минимальная ширина по умолчанию равна
+   ширине содержимого, и колонка «0» просто не схлопнулась бы */
+.list-col { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.list-head {
+  flex: 0 0 auto; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--surface);
+}
+/* На дефолтной ширине колонки (380px) счётчику «N из M» и подписи+селекту
+   сортировки вместе не хватает места — подпись «Сортировка» уходит
+   скринридеру, сама стрелка сортировки (цена ↑/рейтинг ↓...) и так понятна
+   по позиции прямо над списком. В .filters (телефон) подпись остаётся —
+   там это единственный текст в строке, простора достаточно. */
+.list-head .sort span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+/* Блочная раскладка, а не flex+gap: при виртуализации между распорками
+   добавлялись бы лишние зазоры и высота полосы прокрутки уезжала */
+.list { flex: 1; overflow-y: auto; padding: 12px; min-width: 0; min-height: 0; }
+.map-wrap { border-left: 1px solid var(--line); min-height: 0; }
+#map { width: 100%; height: 100%; background: var(--plane); }
+
+/* Зум-контрол Leaflet рисуется своими стилями (белый фон, чёрный текст) —
+   без переопределения в тёмной теме это единственный белый прямоугольник
+   на тёмной карте. Перенесён в правый нижний угол (initMap) — тут только тема. */
+.leaflet-control-zoom a {
+  background: var(--surface); color: var(--ink); border-color: var(--line) !important;
+}
+.leaflet-control-zoom a:hover { background: var(--plane); }
+.leaflet-bar { border-color: var(--line) !important; box-shadow: var(--shadow); }
+
+/* ── Карточка в списке ───────────────────────────────────────────────────── */
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 11px 13px; margin-bottom: 10px; cursor: pointer; transition: border-color .12s, transform .12s;
+}
+.card:hover { border-color: var(--accent); }
+.card[data-active="1"] { border-color: var(--accent); box-shadow: var(--shadow); }
+
+.card-head { display: flex; align-items: baseline; gap: 8px; }
+/* min-width:0 обязателен: без него flex-элемент не даёт себя сжать
+   и обрезание многоточием не срабатывает */
+.loc {
+  font-weight: 600; font-size: 13.5px;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.card-head .price { margin-left: auto; }
+.price { font-weight: 700; font-size: 15px; white-space: nowrap; }
+.card-sub { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--ink-2); font-size: 12.5px; margin-top: 3px; }
+.sep { color: var(--ink-3); }
+
+/* Бейдж «дешевле/дороже рынка» — статусный цвет ВСЕГДА со знаком и подписью,
+   цвет сам по себе смысла не несёт (требование доступности) */
+.fair { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.fair.good { color: var(--good); }
+.fair.bad  { color: var(--bad); }
+
+/* Шкалы осей: длина = значение, цвет один — это одна и та же величина
+   (перцентиль 0–100), а не разные сущности. Идентичность несёт подпись. */
+.axes { margin-top: 9px; display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; }
+.ax-name { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+/* display:block обязателен: <span> по умолчанию строчный, а к строчным
+   не применяются ни width, ни height — заливка не рисовалась вовсе,
+   и все шкалы выглядели одинаковыми (баг прототипа 2026-07-27) */
+.ax-track { display: block; height: 6px; background: var(--accent-soft); border-radius: 3px; overflow: hidden; }
+.ax-fill  { display: block; height: 100%; background: var(--accent); border-radius: 3px; min-width: 2px; }
+.ax-val { font-size: 11px; color: var(--ink-2); font-variant-numeric: tabular-nums; min-width: 22px; text-align: right; }
+
+/* Общий рейтинг — первой строкой, в том же ряду с осями. Разделителя нет:
+   граница рвалась на три куска (сетка из трёх колонок), а padding у дорожки
+   уводил заливку вверх — .ax-fill считает height:100% от блока с отступом.
+   Выделяем только начертанием. */
+.ax-name.ax-total { font-weight: 600; color: var(--ink-2); }
+.ax-val.ax-total { font-weight: 700; color: var(--ink); }
+
+.gap-note { margin-top: 7px; font-size: 11px; color: var(--ink-3); font-style: italic; }
+
+/* ── Карточка-шторка ─────────────────────────────────────────────────────── */
+/* Шторка начинается ПОД шапкой и полосой фильтров, а не от верха окна:
+   раньше top:0 накрывал их собой, и фильтры были недоступны, пока карточка
+   открыта. Высота считается от того же смещения, поэтому прокрутка внутри
+   остаётся своей. */
+.sheet {
+  position: fixed; right: 0; top: var(--chrome-h); bottom: 0;
+  width: min(390px, 92vw);
+  background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow);
+  padding: 14px 16px; overflow-y: auto; z-index: 1200;
+}
+.sheet[hidden] { display: none; }
+.sheet-close {
+  position: absolute; right: 12px; top: 10px;
+  background: none; border: none; color: var(--ink-3); font-size: 17px; cursor: pointer;
+}
+.sheet h2 { margin: 0 24px 4px 0; font-size: 15.5px; line-height: 1.35; }
+.price-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sheet .price { font-size: 18px; }
+.facts { margin: 12px 0; display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 12.5px; }
+.facts dt { color: var(--ink-3); }
+.facts dd { margin: 0; }
+.sheet-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; font-size: 13px; }
+.sheet-links a { color: var(--accent); }
+/* Галерея: крупный кадр фиксированной высоты, чтобы карточка не прыгала
+   при переключении между вертикальными и горизонтальными снимками */
+.ph { position: relative; margin: 12px 0 4px; }
+.ph-main {
+  width: 100%; height: 190px; object-fit: cover;
+  border-radius: 8px; display: block; background: var(--plane);
+}
+/* Стрелки поверх кадра. Появляются на наведении, но на тач-экранах
+   hover не бывает — там показываем всегда */
+.ph-nav {
+  position: absolute; top: 95px; transform: translateY(-50%);
+  width: 30px; height: 44px; border: none; border-radius: 6px;
+  background: rgba(0,0,0,.45); color: #fff; font-size: 20px; line-height: 1;
+  cursor: pointer; opacity: .75; transition: opacity .12s, background .12s;
+}
+/* Видны всегда, а не только на hover: спрятанную стрелку не находят,
+   и на тач-экранах hover не наступает вовсе */
+.ph:hover .ph-nav, .ph-nav:focus-visible { opacity: 1; }
+.ph-nav:hover { background: rgba(0,0,0,.75); }
+.ph-nav:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ph-nav.prev { left: 6px; }
+.ph-nav.next { right: 6px; }
+
+
+.ph-strip {
+  display: flex; gap: 5px; margin-top: 5px;
+  overflow-x: auto; scrollbar-width: thin; padding-bottom: 3px;
+}
+.ph-th {
+  width: 58px; height: 44px; object-fit: cover; border-radius: 5px;
+  flex: 0 0 auto; cursor: pointer; opacity: .55; transition: opacity .12s;
+  border: 2px solid transparent;
+}
+.ph-th:hover { opacity: .85; }
+.ph-th.on { opacity: 1; border-color: var(--accent); }
+/* Счётчик кадров — поверх снимка, читаемо на любом фоне */
+.ph-n {
+  position: absolute; right: 8px; top: 8px;
+  background: rgba(0,0,0,.62); color: #fff;
+  font-size: 11px; padding: 2px 7px; border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* «Что рядом»: две сворачиваемые секции. Знак несёт подпись (Плюсы/Минусы) и
+   полоса слева — цвет один смысла не несёт */
+.dist { margin-top: 14px; }
+.dist > summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.dsec { margin: 8px 0 0 4px; }
+.dsec > summary { cursor: pointer; font-size: 12px; color: var(--ink-2); }
+.dsec.pos > summary::marker { color: var(--good); }
+.dsec.neg > summary::marker { color: var(--bad); }
+.drow {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 4px 0 4px 9px; margin-top: 3px; font-size: 12px;
+  border-left: 3px solid var(--line);
+}
+.dsec.pos .drow { border-left-color: var(--good); }
+.dsec.neg .drow { border-left-color: var(--bad); }
+.drow b { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.drow a { color: var(--accent); }
+.dw { color: var(--ink-3); font-weight: normal; }
+
+/* Снятые с продажи: приглушены целиком — это история, а не предложение */
+.rem { margin-top: 12px; }
+.rem > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink-3); }
+.rrow {
+  padding: 7px 0 7px 9px; margin-top: 4px; font-size: 12px;
+  color: var(--ink-3); border-left: 3px solid var(--line);
+}
+.rrow .roff { font-size: 10px; }
+.rrow a { color: var(--ink-3); text-decoration: underline; }
+
+/* Фильтр по осям: складной, живёт внутри секции «Рейтинг» полной панели —
+   поэтому без собственного плавающего позиционирования (было нужно, пока
+   лежал прямо в открытой полосе фильтров). */
+.axf { position: relative; margin-top: 12px; }
+.axf > summary {
+  cursor: pointer; font-size: 12px; color: var(--ink-2);
+  border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px;
+  list-style: none; user-select: none;
+}
+.axf > summary::-webkit-details-marker { display: none; }
+.axf[open] > summary { border-color: var(--accent); color: var(--ink); }
+.axf-box {
+  position: static; margin-top: 8px; min-width: 0; padding: 0;
+  background: none; border: none; box-shadow: none;
+}
+.axf-hint { margin: 0 0 9px; font-size: 11px; color: var(--ink-2); line-height: 1.4; }
+.axf-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-top: 6px; font-size: 12px; color: var(--ink-2);
+}
+.axf-row input { width: 92px; }
+
+/* Плашка «данные обновились» — снизу справа, поверх карты, но не поверх шторки.
+   bottom:96px, не 16px: зум-контрол Leaflet перенесён в тот же угол (initMap,
+   position:"bottomright") — под ним ещё и attribution-строка карты. 16px
+   сидело прямо на них (юзер поймал живьём). Высота стопки: 52px сам зум
+   (два квадрата 26px) + отступ Leaflet от края + строка атрибуции — с запасом. */
+.fresh {
+  position: fixed; right: 16px; bottom: 96px; z-index: 1100;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 13px; font-size: 13px;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+
+/* Кнопка сравнения: компактная, одинаковая в списке и в шторке.
+   Нажатое состояние — фоном, а не только цветом текста */
+.cmp-btn {
+  background: var(--surface); color: var(--ink-2);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 2px 8px; font: inherit; font-size: 12px; cursor: pointer;
+  white-space: nowrap; flex: 0 0 auto;
+}
+.cmp-btn:hover { border-color: var(--accent); color: var(--ink); }
+.cmp-btn[aria-pressed="true"] { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
+/* В списке подпись та же, что в карточке: значок ⇄ никому ничего не говорил.
+   Подпись бывает длинной («Сравнить с уже выбранной»), поэтому она не
+   переносится, а место уступает адрес — он обрезается многоточием. */
+.card-cmp { padding: 1px 7px; font-size: 11.5px; line-height: 1.45; }
+
+/* Таблица сравнения: две колонки. Одинаковые строки гасим — сравнение
+   про различия; лучшее значение помечено И цветом, И звёздочкой, потому что
+   цвет сам по себе смысла не несёт */
+.cmp { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 12.5px; }
+.cmp th, .cmp td {
+  padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.cmp th:first-child { text-align: left; color: var(--ink-3); font-weight: normal; }
+.cmp tr:first-child th { text-align: right; color: var(--ink); font-weight: 600; }
+.cmp tr:first-child th:first-child { text-align: left; }
+.cmp-best { color: var(--good); font-weight: 600; }
+.cmp-same td, .cmp-same th { color: var(--ink-3); }
+
+.empty { color: var(--ink-3); text-align: center; padding: 40px 12px; }
+
+/* Легенда PM2.5: шкала регламентированная, цвет несёт смысл сам по себе,
+   поэтому подпись диапазона обязана стоять рядом с образцом цвета */
+.legend {
+  background: var(--surface); color: var(--ink-2);
+  border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow);
+  padding: 7px 9px; font-size: 11px; line-height: 1.6;
+}
+.legend b { display: block; color: var(--ink); font-size: 11px; margin-bottom: 3px; }
+.legend span { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.legend i { width: 11px; height: 11px; border-radius: 2px; flex: 0 0 auto; }
+
+/* ── Панель слоёв (заменила L.control.layers) ────────────────────────────── */
+.lp { position: relative; }
+.lp-btn {
+  position: relative; display: grid; place-items: center; width: 34px; height: 34px; padding: 0;
+  color: var(--ink); background: var(--surface); cursor: pointer;
+  border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow);
+}
+.lp-btn:hover { background: var(--plane); }
+.lp-btn:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+.lp-n {
+  position: absolute; top: -6px; right: -6px; min-width: 16px; padding: 0 4px;
+  font: 600 10px/16px system-ui, sans-serif; font-style: normal; text-align: center;
+  color: #fff; background: var(--accent-fill, #256abf); border-radius: 8px;
+}
+.lp-body {
+  position: absolute; top: 40px; right: 0; width: 250px;
+  max-height: min(72vh, 560px); overflow-y: auto; padding: 4px 10px 8px;
+  color: var(--ink-2); background: var(--surface); font-size: 12px;
+  border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow);
+}
+.lp-body[hidden] { display: none; }
+.lp-g { border-bottom: 1px solid var(--line); padding: 2px 0; }
+.lp-g:last-child { border-bottom: none; }
+.lp-g summary {
+  display: flex; align-items: center; gap: 6px; padding: 6px 0; cursor: pointer;
+  color: var(--ink); font-weight: 600; list-style: none;
+}
+.lp-g summary::-webkit-details-marker { display: none; }
+.lp-g summary::before { content: "▸"; color: var(--ink-3); font-size: 10px; transition: transform .15s; }
+.lp-g[open] summary::before { transform: rotate(90deg); }
+.lp-g summary em {
+  margin-left: auto; padding: 0 6px; font: 600 10px/16px system-ui, sans-serif; font-style: normal;
+  color: var(--accent-ink); background: var(--accent-soft); border-radius: 8px;
+}
+.lp-i { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0 4px 14px; cursor: pointer; line-height: 1.35; }
+.lp-i input { margin-top: 2px; }
+.lp-sel { display: flex; flex-direction: column; gap: 3px; padding: 2px 0 6px 14px; }
+.lp-sel select { font: inherit; padding: 3px 4px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.lp-seg { display: flex; gap: 14px; padding: 0 0 6px 14px; }
+.lp-seg label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+@media (max-width: 700px) { .lp-body { width: min(280px, calc(100vw - 70px)); max-height: 60vh; } }
+
+/* Тултип точки «Снято с продажи»: список квартир в одной точке (см. removedTipHtml
+   в app.js). Leaflet рисует тултип белым независимо от темы страницы — этого
+   достаточно для контраста, здесь только структура строк. */
+.leaflet-tooltip.rem-tip { max-width: 260px; white-space: normal; line-height: 1.35; }
+.rem-tip-row { padding: 3px 0; }
+.rem-tip-row + .rem-tip-row { border-top: 1px solid #0000001a; }
+.rem-tip-more { margin-top: 2px; font-size: 11px; color: #666; }
+
+/* Попап остановки / станции */
+.stop-popup .leaflet-popup-content { margin: 10px 12px; min-width: 190px; }
+.stop-pop .stop-kind { display: block; color: var(--ink-3); font-size: 11px; letter-spacing: .02em; }
+.stop-pop .stop-name { color: var(--ink); font-size: 15px; font-weight: 700; line-height: 1.25; margin-top: 1px; }
+.stop-pop .lchips { margin: 6px 0; }
+.stop-pop .seg-r { display: flex; gap: 6px; margin: 4px 0 6px; }
+.stop-pop .seg-r button { flex: 1; padding: 3px 6px; font-size: 12px; cursor: pointer; }
+.stop-pop .seg-r button.on { color: #fff; background: var(--accent-fill, #256abf); border-color: transparent; }
+.stop-pop .near-n { margin: 2px 0 8px; color: var(--ink-2); font-size: 12px; }
+.pop-btn {
+  width: 100%; padding: 6px 8px; font: inherit; font-size: 12px; cursor: pointer;
+  color: #fff; background: var(--accent-fill, #256abf); border: none; border-radius: 6px;
+}
+.pop-btn:hover { filter: brightness(1.08); }
+.pop-btn:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+
+/* Чёрный список, повторы объявлений */
+.hide-btn {
+  padding: 0 6px; font-size: 13px; line-height: 22px; cursor: pointer; opacity: .55;
+  color: var(--ink-2); background: transparent; border: 1px solid transparent; border-radius: 6px;
+}
+.hide-btn:hover, .hide-btn:focus-visible { opacity: 1; background: var(--plane); border-color: var(--line); }
+/* Избранное — та же кнопка-иконка, что и «Скрыть», рядом с ней (см. hide-btn выше):
+   разные, не взаимоисключающие состояния, поэтому стиль намеренно идентичен. */
+.fav-btn {
+  padding: 0 6px; font-size: 13px; line-height: 22px; cursor: pointer; opacity: .55;
+  color: var(--ink-2); background: transparent; border: 1px solid transparent; border-radius: 6px;
+}
+.fav-btn:hover, .fav-btn:focus-visible { opacity: 1; background: var(--plane); border-color: var(--line); }
+.dup-note {
+  display: inline-block; margin-top: 4px; padding: 0 8px; font-size: 11px; line-height: 18px;
+  color: var(--accent-ink); background: var(--accent-soft); border-radius: 9px;
+}
+.dups { margin: 10px 0; padding: 8px 10px; background: var(--plane); border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
+.dups summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+.dups ul { margin: 8px 0 6px; padding: 0; list-style: none; display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
+.dups li { display: flex; gap: 8px; justify-content: space-between; align-items: baseline; }
+.dups li a { white-space: nowrap; }
+.dups li span { color: var(--ink-3); text-align: right; }
+.dups small { display: block; color: var(--ink-3); line-height: 1.4; }
+.hide-wide {
+  padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer;
+  color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+}
+.hide-wide:hover { background: var(--plane); }
+#toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 2000;
+  display: flex; align-items: center; gap: 12px; max-width: min(92vw, 520px); padding: 10px 14px;
+  color: var(--ink); background: var(--surface); font-size: 13px;
+  border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
+}
+#toast[hidden] { display: none; }
+#toast button { font: inherit; font-weight: 600; color: var(--accent-ink); background: none; border: none; cursor: pointer; }
+
+/* Панель номеров линий трамваев и метро */
+.lines-box { max-width: min(340px, 86vw); }
+.lines-box small { display: block; margin-top: 4px; color: var(--ink-3); font-size: 11px; }
+.lines-box a { color: var(--accent-ink); }
+.lchips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.lchip {
+  min-width: 30px; padding: 2px 6px; font: inherit; font-size: 11px; line-height: 1.5;
+  color: var(--ink); background: var(--surface); cursor: pointer;
+  border: 2px solid var(--c); border-radius: 999px;
+}
+.lchip:hover { background: var(--plane); }
+.lchip.on { background: var(--c); color: #fff; }
+.lchip:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 1px; }
+
+/* Кнопка «Фильтры» и вкладки — только для узкого экрана */
+#flt-toggle, .tabs { display: none; }
+.tabs { gap: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.tab {
+  background: var(--surface); color: var(--ink-2); border: none;
+  padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.tab[aria-selected="true"] { background: var(--accent-fill); color: #fff; }
+
+/* Промежуточной раскладки нет намеренно. Раньше на 700-900px список и карта
+   складывались в строки, и там жил тот же баг: элементов сетки три, строк
+   объявлено две — карта попадала в неявную строку. Две раскладки вместо трёх:
+   до 700px вкладки, выше — колонки с разделителем. */
+
+/* ── Телефон ─────────────────────────────────────────────────────────────────
+   Отдельная раскладка, а не подгонка широкой. Список и карта — ВКЛАДКИ, каждая
+   на весь экран: делить шесть дюймов между ними бессмысленно.
+   Панель фильтров открывается поверх экрана и имеет свою кнопку закрытия.
+   (Оформление панели ещё дорабатывается — договорились чинить телефон отдельно.) */
+@media (max-width: 700px) {
+  #flt-toggle, .tabs { display: inline-flex; }
+  #collapse { display: none; }
+
+  /* Не сетка вовсе: две панели друг поверх друга, видна одна */
+  .split { display: block; position: relative; }
+  .list-col, .map-wrap { position: absolute; inset: 0; }
+  .map-wrap { display: none; border: none; }
+  body.tab-map .list-col { display: none; }
+  body.tab-map .map-wrap { display: block; }
+  .gutter { display: none; }
+
+  /* Панель фильтров поверх содержимого, с липким заголовком. Пилюль и
+     поповеров на телефоне нет — компактная строка скрыта, а «полная панель»
+     принудительно развёрнута и занимает всё оставшееся место, поэтому
+     секции («Быстрые», «Квартира», «Рейтинг»…) идут одной прокручиваемой
+     лентой, как на артборде Mobile.dc.html. */
+  .filters { display: none; }
+  body.flt-open .filters {
+    display: flex; flex-direction: column; position: fixed; z-index: 1150;
+    left: 0; right: 0; top: var(--head-h, 46px); bottom: 0; overflow: hidden;
+  }
+  .flt-head {
+    display: flex; align-items: center; justify-content: space-between;
+    flex: 0 0 auto; width: 100%;
+    padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--line);
+  }
+  .flt-bar { display: none; }
+  .flt-chips { padding: 10px 14px 0; }
+  #fgrp-quick { display: block; }
+  .flt-panel, .flt-panel[hidden] {
+    display: flex; position: static; z-index: auto;
+    width: auto; max-height: none; flex: 1; min-height: 0;
+    border: none; border-radius: 0; box-shadow: none;
+  }
+  .flt-panel-body { padding: 14px; }
+  .fgrp:not(:last-child) { border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+  .flt-panel-foot { padding: 12px 14px; background: var(--surface); }
+  .profile-btn { padding: 0; }
+
+  /* Шапка ужимается. На 390 px её содержимое занимало ~550 px и страница
+     ездила вбок: название, «1957 из 1957», вкладки, «Фильтры · 15» и две
+     кнопки не помещались. Убираем название (вкладки и так говорят, где ты),
+     счётчик показываем одним числом, кнопке фильтров вернули короткую подпись. */
+  .top { padding: 8px 10px; gap: 6px; flex-wrap: nowrap; }
+  .brand-home { display: none; }
+  .brand { flex: 0 0 auto; }
+  .count { font-size: 12px; }
+  .top-right { flex: 1 1 auto; justify-content: flex-end; gap: 6px; min-width: 0; }
+  .top .sort { display: none; }
+  .ghost { padding: 5px 9px; }
+  .tab { padding: 5px 10px; }
+  .sheet { width: 100vw; }
+}

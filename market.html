@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Лёгкая landing-страница части 2 пивота (маркетплейс для мигрантов) —
+     без карты/Leaflet, поэтому CSP проще, чем у app.html: не нужен unpkg. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="description" content="Квартиры в Варшаве с честным рейтингом по 44 критериям — шум, транспорт, инфраструктура, зелень. Бесплатно.">
+<title>Warsaw Flats — квартиры в Варшаве</title>
+<link rel="stylesheet" href="app.css?v=202609261836">
+<style>
+  /* Только то, чего нет в app.css: сама landing-раскладка. Цвета/шрифты/
+     кнопки/карточки — всё переиспользовано напрямую, без своего языка.
+
+     ОДНА нужная поправка поверх app.css: там html,body{height:100%} и
+     body{display:flex;flex-direction:column} — фиксированная «оболочка
+     приложения» под app.html, где страница сама никогда не скроллится,
+     скроллится только .list внутри неё. Обычной длинной странице (эта)
+     такая раскладка не подходит — контент ниже экрана просто обрезался
+     бы, а не скроллился. Возвращаем обычное поведение только здесь. */
+  html, body { height: auto; min-height: 100%; }
+  body { display: block; }
+  .mkt-wrap { max-width: 720px; margin: 0 auto; padding: 0 20px 64px; }
+  .mkt-hero { padding: 56px 0 36px; text-align: center; }
+  .mkt-hero h1 { font-size: 28px; line-height: 1.3; margin: 0 0 14px; letter-spacing: -.2px; }
+  .mkt-hero p { font-size: 15px; color: var(--ink-2); line-height: 1.55; max-width: 520px; margin: 0 auto 28px; }
+  .mkt-cta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .mkt-cta .btn-primary { padding: 12px 26px; font-size: 14px; }
+  .mkt-cta .ghost-btn {
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    border-radius: 8px; padding: 12px 22px; font: inherit; font-size: 14px; cursor: pointer; text-decoration: none;
+  }
+  .mkt-cta .ghost-btn:hover { border-color: var(--ink-3); }
+  .mkt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 36px 0; }
+  .mkt-card { padding: 16px; }
+  .mkt-card .n { font-size: 22px; font-weight: 700; color: var(--accent-ink); }
+  .mkt-card .t { font-size: 13px; color: var(--ink-2); margin-top: 4px; line-height: 1.4; }
+  .mkt-section { margin: 40px 0; }
+  .mkt-section h2 { font-size: 18px; margin: 0 0 12px; }
+  .mkt-section p { font-size: 14px; color: var(--ink-2); line-height: 1.6; margin: 0 0 10px; }
+  .mkt-soon {
+    display: flex; align-items: center; gap: 12px; padding: 16px 18px;
+    border: 1px dashed var(--line); border-radius: var(--radius); background: var(--plane);
+  }
+  .mkt-soon p { margin: 0; font-size: 13px; color: var(--ink-2); }
+  .mkt-soon .btn-primary { flex: 0 0 auto; text-decoration: none; padding: 9px 18px; font-size: 13px; }
+  .mkt-foot { text-align: center; padding-top: 24px; border-top: 1px solid var(--line); }
+  .mkt-foot a { color: var(--ink-2); font-size: 13px; }
+  /* menu-fav/menu-hidden — обычные <a>, не <button> (см. market.js/
+     site-ui.js: пункты меню профиля здесь просто ссылка на app.html?view=…) —
+     .menu-item в app.css не сбрасывает text-decoration, кнопкам это не
+     нужно, ссылкам — нужно. */
+  .menu-item[href] { text-decoration: none; }
+</style>
+</head>
+<body data-palette="#2a78d6,#0ca30c,#d03b3b">
+
+<header class="top">
+  <div class="brand">
+    <a href="app.html" class="brand-home" style="text-decoration:none;display:inline-block;">Warsaw&nbsp;Flats</a>
+  </div>
+  <div class="top-right">
+    <button id="lang" class="ghost" title="Język / Язык">PL</button>
+    <button id="theme" class="ghost" data-i18n-title="theme_t" data-i18n-aria="theme_t"
+            title="Светлая / тёмная тема" aria-pressed="false">◐</button>
+    <div class="profile" id="profile">
+      <button id="profile-btn" class="ghost profile-btn" type="button"
+              aria-haspopup="true" aria-expanded="false" aria-controls="profile-menu"
+              data-i18n-aria="profile_a" aria-label="Профиль: избранное и скрытые">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path>
+        </svg>
+        <span class="profile-dot" id="profile-dot" hidden></span>
+      </button>
+      <div class="profile-menu" id="profile-menu" hidden>
+        <div class="profile-menu-head" data-i18n="profile_device">Это устройство · без входа</div>
+        <a class="menu-item" id="menu-fav" href="app.html?view=fav">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"></path>
+          </svg>
+          <span class="menu-item-label" data-i18n="menu_fav">Избранное</span>
+          <span class="menu-badge" hidden>0</span>
+        </a>
+        <a class="menu-item" id="menu-hidden" href="app.html?view=hidden">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 3l18 18"></path>
+            <path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6A17 17 0 0 0 2 12s4 7 10 7a10 10 0 0 0 5.4-1.6"></path>
+          </svg>
+          <span class="menu-item-label" data-i18n="menu_hidden">Скрытые</span>
+          <span class="menu-badge" hidden>0</span>
+        </a>
+        <div class="menu-divider"></div>
+        <div class="menu-item menu-item-soon" aria-disabled="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 9l9-6 9 6v11a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"></path>
+          </svg>
+          <span class="menu-item-label" data-i18n="menu_listings">Мои объявления</span>
+          <span class="menu-badge menu-badge-soon" data-i18n="menu_soon">скоро</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="mkt-wrap">
+
+  <section class="mkt-hero">
+    <h1 data-i18n="hero_h1">Ищете квартиру в Варшаве?</h1>
+    <p data-i18n="hero_p">
+      Собрали объявления по всему городу и оценили каждую квартиру честно —
+      не только цена и метраж, а шум, дорога до метро, зелень рядом,
+      инфраструктура. Бесплатно, без регистрации.
+    </p>
+    <div class="mkt-cta">
+      <a href="app.html" class="btn-primary" data-i18n="cta_view" style="text-decoration:none;display:inline-block;">Смотреть квартиры</a>
+      <a href="valuate.html" class="ghost-btn" data-i18n="cta_valuate">Оценить конкретную квартиру</a>
+    </div>
+  </section>
+
+  <div class="mkt-grid">
+    <div class="card mkt-card">
+      <div class="n" id="mkt-count">—</div>
+      <div class="t" data-i18n="stat_count">квартир в базе прямо сейчас</div>
+    </div>
+    <div class="card mkt-card">
+      <div class="n">44</div>
+      <div class="t" data-i18n="stat_criteria">критерия в рейтинге: транспорт, шум, зелень, инфраструктура</div>
+    </div>
+    <div class="card mkt-card">
+      <div class="n">0&nbsp;zł</div>
+      <div class="t" data-i18n="stat_free">бесплатно, без регистрации и скрытых условий</div>
+    </div>
+  </div>
+
+  <section class="mkt-section">
+    <h2 data-i18n="how_title">Как это работает</h2>
+    <p data-i18n="how_p1">
+      Каждая квартира получает рейтинг 0–100 по пяти направлениям: транспорт,
+      инфраструктура, зелень и тишина, соседство, сама квартира и дом. Видно
+      не только «сколько метров», а честно — рядом ли шумная дорога или
+      аэропорт, далеко ли до ближайшей школы, сколько идти до метро пешком.
+    </p>
+    <p>
+      <span data-i18n="how_p2_pre">Нашли квартиру не в нашей базе (на другом сайте или по объявлению)?
+      Можно</span> <a href="valuate.html" data-i18n="how_p2_link">оценить её отдельно</a><span data-i18n="how_p2_post"> — вставить ссылку
+      или ввести параметры вручную и получить тот же честный анализ.</span>
+    </p>
+  </section>
+
+  <section class="mkt-section">
+    <div class="mkt-soon">
+      <p data-i18n="soon_p">Продаёте или сдаёте квартиру? Оставьте заявку — мы свяжемся с вами.</p>
+      <a href="list-apartment.html" class="btn-primary" data-i18n="soon_cta">Разместить объявление</a>
+    </div>
+  </section>
+
+  <div class="mkt-foot">
+    <a href="app.html" data-i18n="foot_link">Перейти к полному списку и карте →</a>
+  </div>
+
+</div>
+
+<script src="market.js?v=202609261836" type="module"></script>
+
+</body>
+</html>

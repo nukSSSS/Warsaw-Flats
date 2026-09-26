@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Политика загрузки ресурсов. Публичная страница показывает данные из внешних
+     источников (Otodom, Airly) — это вторая линия обороны от XSS, если
+     экранирование где-то пропустят. Разрешено: свои файлы, Leaflet с unpkg,
+     картинки по https (фото Otodom, тайлы Esri, шумовой WMS Варшавы).
+     'unsafe-inline' только для стилей: Leaflet и карточки ставят style="…". -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Warsaw Flats</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="app.css?v=202609261836">
+</head>
+<body data-palette="#2a78d6,#0ca30c,#d03b3b">
+
+<header class="top">
+  <div class="brand">
+    <!-- Клик по названию — сброс всех фильтров и возврат к стартовой выдаче,
+         обычный паттерн «логотип = домой». Реальная кнопка, не div/span
+         с onclick — доступна с клавиатуры и озвучивается скринридером. -->
+    <button type="button" class="brand-home" id="brand-home"
+            data-i18n-aria="brand_home_a" aria-label="Warsaw Flats — сбросить фильтры">Warsaw&nbsp;Flats</button>
+  </div>
+  <div class="top-right">
+    <div class="tabs" id="tabs" role="tablist">
+      <button class="tab" id="tab-list" role="tab" aria-selected="true" aria-controls="list"
+              data-i18n="tab_list">Список</button>
+      <button class="tab" id="tab-map" role="tab" aria-selected="false" aria-controls="map-wrap"
+              data-i18n="tab_map">Карта</button>
+    </div>
+    <button id="flt-toggle" class="ghost" aria-expanded="false"
+            aria-controls="filters">Фильтры</button>
+    <button id="collapse" class="ghost" aria-pressed="false" title="Свернуть список"
+            data-i18n-aria="collapse_t">◧</button>
+    <button id="lang" class="ghost" title="Język / Язык">PL</button>
+    <button id="theme" class="ghost" data-i18n-title="theme_t" data-i18n-aria="theme_t"
+            title="Светлая / тёмная тема" aria-pressed="false">◐</button>
+    <!-- Профиль: сюда переехали «Избранное» и «Скрытые» — без выдуманного логина,
+         сайт без аккаунтов, это состояние ЭТОГО браузера (localStorage). -->
+    <div class="profile" id="profile">
+      <button id="profile-btn" class="ghost profile-btn" type="button"
+              aria-haspopup="true" aria-expanded="false" aria-controls="profile-menu"
+              data-i18n-aria="profile_a" aria-label="Профиль: избранное и скрытые">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path>
+        </svg>
+        <span class="profile-dot" id="profile-dot" hidden></span>
+      </button>
+      <div class="profile-menu" id="profile-menu" hidden>
+        <div class="profile-menu-head" data-i18n="profile_device">Это устройство · без входа</div>
+        <button type="button" class="menu-item" id="menu-fav" aria-pressed="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"></path>
+          </svg>
+          <span class="menu-item-label" data-i18n="menu_fav">Избранное</span>
+          <span class="menu-badge" hidden>0</span>
+        </button>
+        <button type="button" class="menu-item" id="menu-hidden" aria-pressed="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 3l18 18"></path>
+            <path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6A17 17 0 0 0 2 12s4 7 10 7a10 10 0 0 0 5.4-1.6"></path>
+          </svg>
+          <span class="menu-item-label" data-i18n="menu_hidden">Скрытые</span>
+          <span class="menu-badge" hidden>0</span>
+        </button>
+        <!-- Не фича, а задел: показывает, куда сможет вырасти профиль под часть 2
+             пивота (маркетплейс). Не кликабельна, ничего не обещает по срокам. -->
+        <div class="menu-divider"></div>
+        <div class="menu-item menu-item-soon" aria-disabled="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 9l9-6 9 6v11a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"></path>
+          </svg>
+          <span class="menu-item-label" data-i18n="menu_listings">Мои объявления</span>
+          <span class="menu-badge menu-badge-soon" data-i18n="menu_soon">скоро</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Компактная панель фильтров: 3 быстрых пилюли (Цена/Комнаты/Район) с поповерами,
+     «Ещё фильтры N» открывает полную панель секциями, активные фильтры — чипами.
+     .flt-head виден только на телефоне — там панель открывается поверх экрана
+     и ей нужна своя кнопка закрытия; там же вся разметка ниже идёт одной
+     прокручиваемой лентой секций вместо поповеров (см. media-запрос в app.css). -->
+<section class="filters" id="filters">
+  <div class="flt-head">
+    <strong data-i18n="flt">Фильтры</strong>
+    <button id="flt-done" class="ghost" data-i18n="flt_done">Готово</button>
+  </div>
+
+  <div class="flt-bar">
+    <div class="pop">
+      <button type="button" class="pill" id="pill-price" aria-haspopup="true" aria-expanded="false" aria-controls="pop-price-box">
+        <span data-i18n="f_price">Цена, тыс.</span><span class="pill-val" id="pill-price-val"></span><span class="pill-car" aria-hidden="true">▾</span>
+      </button>
+      <div class="pop-box" id="pop-price-box" hidden></div>
+    </div>
+    <div class="pop">
+      <button type="button" class="pill" id="pill-rooms" aria-haspopup="true" aria-expanded="false" aria-controls="pop-rooms-box">
+        <span data-i18n="f_rooms">Комнаты</span><span class="pill-val" id="pill-rooms-val"></span><span class="pill-car" aria-hidden="true">▾</span>
+      </button>
+      <div class="pop-box" id="pop-rooms-box" hidden></div>
+    </div>
+    <div class="pop">
+      <button type="button" class="pill" id="pill-district" aria-haspopup="true" aria-expanded="false" aria-controls="pop-district-box">
+        <span data-i18n="f_district">Район</span><span class="pill-val" id="pill-district-val"></span><span class="pill-car" aria-hidden="true">▾</span>
+      </button>
+      <div class="pop-box pop-box-wide" id="pop-district-box" hidden></div>
+    </div>
+    <button type="button" class="pill pill-more" id="btn-more" aria-haspopup="true" aria-expanded="false" aria-controls="flt-panel">
+      <span data-i18n="flt_more">Ещё фильтры</span><span class="pill-badge" id="more-badge" hidden>0</span>
+    </button>
+    <div class="flt-spacer"></div>
+    <button type="button" id="reset" class="reset-link" data-i18n="reset_all">Сбросить всё</button>
+  </div>
+
+  <div class="flt-chips" id="flt-chips" hidden></div>
+
+  <div class="flt-panel" id="flt-panel" hidden>
+    <div class="flt-panel-body">
+      <section class="fgrp" id="fgrp-quick">
+        <h3 class="fgrp-t" data-i18n="fg_quick">Быстрые</h3>
+        <div class="qfield" id="qf-price">
+          <span class="field-label" data-i18n="f_price">Цена, тыс.</span>
+          <div class="fld-row">
+            <label class="fld"><span data-i18n="from">от</span><input type="number" id="f-pmin"></label>
+            <label class="fld"><span data-i18n="to">до</span><input type="number" id="f-pmax"></label>
+          </div>
+        </div>
+        <div class="qfield" id="qf-rooms">
+          <span class="field-label" data-i18n="f_rooms">Комнаты</span>
+          <span class="chips" id="f-rooms"></span>
+        </div>
+      </section>
+
+      <section class="fgrp">
+        <h3 class="fgrp-t" data-i18n="fg_apt">Квартира</h3>
+        <span class="field-label" data-i18n="f_area">Площадь, м²</span>
+        <div class="fld-row">
+          <label class="fld"><span data-i18n="from">от</span><input type="number" id="f-amin"></label>
+          <label class="fld"><span data-i18n="to">до</span><input type="number" id="f-amax"></label>
+        </div>
+        <span class="field-label" data-i18n="f_year">Год</span>
+        <div class="fld-row">
+          <label class="fld"><span data-i18n="from">от</span><input type="number" id="f-ymin"></label>
+          <label class="fld"><span data-i18n="to">до</span><input type="number" id="f-ymax"></label>
+        </div>
+      </section>
+
+      <section class="fgrp">
+        <h3 class="fgrp-t" data-i18n="fg_rating">Рейтинг</h3>
+        <span class="field-label" data-i18n="f_score">Рейтинг</span>
+        <div class="fld-row">
+          <label class="fld"><span data-i18n="from">от</span><input type="number" id="f-smin" min="0" max="100"></label>
+          <label class="fld"><span data-i18n="to">до</span><input type="number" id="f-smax" min="0" max="100"></label>
+        </div>
+        <details class="axf" id="f-axes">
+          <summary data-i18n="f_axes">Оси рейтинга</summary>
+          <div class="axf-box"></div>
+        </details>
+      </section>
+
+      <section class="fgrp">
+        <h3 class="fgrp-t" data-i18n="fg_seller">Продавец и рынок</h3>
+        <span class="field-label" data-i18n="f_market">Рынок</span>
+        <span class="chips" id="f-market"></span>
+        <span class="field-label" data-i18n="f_seller">Продавец</span>
+        <span class="chips" id="f-seller"></span>
+        <span class="field-label" data-i18n="f_cond">Состояние</span>
+        <span class="chips" id="f-cond"></span>
+      </section>
+
+      <section class="fgrp" id="fgrp-loc">
+        <h3 class="fgrp-t" data-i18n="fg_loc">Локация</h3>
+        <div class="qfield" id="qf-district">
+          <span class="field-label" data-i18n="f_district">Район</span>
+          <div class="dist-list" id="f-district"></div>
+        </div>
+        <div id="commute-field">
+          <span class="field-label" data-i18n="f_commute">Дорога, мин</span>
+          <label class="fld fld-narrow"><span data-i18n="to">до</span><input type="number" id="f-tmax" min="0" max="120"></label>
+        </div>
+      </section>
+    </div>
+    <div class="flt-panel-foot">
+      <button type="button" class="reset-link" id="panel-reset" data-i18n="reset">Сброс</button>
+      <button type="button" class="btn-primary" id="panel-apply"></button>
+    </div>
+  </div>
+</section>
+
+<main class="split">
+  <!-- Список результатов: счётчик и сортировка — своей строкой НАД карточками,
+       а не разнесены по общей шапке (счётчик был у логотипа, сортировка —
+       среди PL/темы/профиля; ни то ни другое не по смыслу рядом с самим
+       списком, к которому оба относятся). -->
+  <div class="list-col">
+    <div class="list-head">
+      <span id="count" class="count" aria-live="polite">загрузка…</span>
+      <label class="sort">
+        <span data-i18n="sort">Сортировка</span>
+        <select id="sort">
+          <option value="p" data-i18n="s_p">цена ↑</option>
+          <option value="-p" data-i18n="s_pd">цена ↓</option>
+          <option value="-sc" data-i18n="s_sc">рейтинг ↓</option>
+          <option value="ppm" data-i18n="s_ppm">цена за м² ↑</option>
+          <option value="-a" data-i18n="s_a">площадь ↓</option>
+          <option value="-seen" data-i18n="s_new">новизна</option>
+        </select>
+      </label>
+    </div>
+    <section class="list" id="list" role="tabpanel" aria-labelledby="tab-list"
+              aria-label="Список квартир" data-i18n-aria="list_a"></section>
+  </div>
+
+  <!-- Разделитель: тянем — меняется ширина списка -->
+  <div class="gutter" id="gutter" role="separator" aria-orientation="vertical"
+       tabindex="0" title="Потяните, чтобы изменить ширину списка"></div>
+
+  <!-- Карта -->
+  <section class="map-wrap" id="map-wrap" role="tabpanel" aria-labelledby="tab-map">
+    <div id="map"></div>
+  </section>
+</main>
+
+<!-- Карточка квартиры: выезжает поверх при выборе -->
+<aside class="sheet" id="sheet" hidden role="dialog" aria-labelledby="sheet-h2">
+  <button class="sheet-close" id="sheet-close" aria-label="Закрыть" data-i18n-aria="close_a">✕</button>
+  <div id="sheet-body"></div>
+</aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="app.js?v=202609261836" type="module"></script>
+</body>
+</html>
