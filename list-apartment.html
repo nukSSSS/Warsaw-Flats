@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Своя, узкая CSP — как у valuate.html: страница только форма + JSON-ответ
+     своего бэкенда (6.valuate/api.py::POST /submit-listing). connect-src
+     разрешает localhost:5050 (см. API_BASE в list-apartment.js, локальная
+     разработка) и *.trycloudflare.com — эксперимент с Cloudflare Quick
+     Tunnel (2026-09-27), поддомен меняется при перезапуске туннеля, отсюда
+     wildcard. Появится постоянный сервер/домен — сузить обратно до 'self'
+     + этого домена. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:5050 http://127.0.0.1:5050 https://*.trycloudflare.com; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="description" content="Разместите заявку на продажу или сдачу квартиры в Варшаве — мы свяжемся с вами вручную.">
+<title>Warsaw Flats — разместить объявление</title>
+<link rel="stylesheet" href="app.css?v=202610040158">
+<link rel="stylesheet" href="ds.css?v=202610040158">
+<style>
+  /* Раскладка страницы «Разместить объявление». Внешний вид элементов —
+     компоненты ds.css (ds-section, ds-field, ds-input, ds-chip, ds-note, ds-btn);
+     здесь только где что стоит. Эталон — макет «Разместить объявление»
+     (Artifact «Warsaw Flats — Мои места и профиль», экраны 10–11); сверка —
+     design_check/check.py list. */
+
+  /* Обычная страница, не «оболочка» app.html с внутренним скроллом */
+  html, body { height: auto; min-height: 100%; }
+  body { display: block; background: var(--plane); }
+
+  .la-wrap {
+    box-sizing: border-box; width: 100%; max-width: 640px; margin: 0 auto;
+    padding: 40px 20px 0; display: flex; flex-direction: column; gap: 28px;
+  }
+  .la-hero { display: flex; flex-direction: column; gap: 10px; }
+  .la-h1 { margin: 0; font-size: var(--fs-h1); font-weight: 700; letter-spacing: -.2px; }
+  .la-sub { margin: 0; font-size: var(--fs-body); line-height: 1.55; color: var(--ink-2); }
+
+  .la-form {
+    box-sizing: border-box; display: flex; flex-direction: column; gap: 22px; padding: 20px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel);
+  }
+  .la-actions {
+    display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+    padding-top: 16px; border-top: 1px solid var(--line);
+  }
+  .la-msg { font-size: var(--fs-meta); margin-right: auto; }
+  .la-msg[hidden] { display: none; }
+  .la-msg.err { color: var(--bad); }
+  .la-msg.ok { color: var(--good); }
+
+  /* Honeypot против спам-ботов (см. list-apartment.js и докстринг
+     6.valuate/api.py::_validate_listing_submission): поле _hp человек не
+     видит и не может заполнить — вынесено за экран (не display:none, его
+     часть простых ботов распознаёт), tabindex="-1", aria-hidden="true".
+     Автозаполнители форм находят поле по DOM и подставляют значение —
+     так бот отличается от человека. */
+  .la-hp { position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+  .mkt-foot { padding: 8px 0 32px; text-align: center; }
+  .mkt-foot a { color: var(--ink-2); font-size: 13px; }
+  .brand-home[href] { text-decoration: none; }
+
+  @media (max-width: 760px) {
+    /* app.css на узком экране прячет название и сжимает шапку — это ради
+       вкладок и фильтров app.html; здесь места хватает, шапка как на макете */
+    .top { padding: 10px 16px; }
+    .brand-home { display: inline-block; }
+    .count { font-size: 13px; }
+    .ghost { padding: 5px 10px; }
+    .profile-btn { padding: 0; }
+    .top-right { gap: 10px; }
+    .la-wrap { padding: 24px 16px 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <a class="brand-home" href="market.html">Warsaw&nbsp;Flats</a>
+    <span class="count" data-i18n="la_header_label">Разместить объявление</span>
+  </div>
+  <div class="top-right">
+    <button id="lang" class="ghost" title="Język / Язык">PL</button>
+    <button id="theme" class="ghost" data-i18n-title="theme_t" data-i18n-aria="theme_t"
+            title="Светлая / тёмная тема" aria-pressed="false">◐</button>
+    <div class="profile" id="profile">
+      <button id="profile-btn" class="ghost profile-btn" type="button"
+              aria-haspopup="true" aria-expanded="false" aria-controls="profile-menu"
+              data-i18n-aria="profile_a" aria-label="Профиль: избранное и скрытые">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path>
+        </svg>
+        <span class="profile-dot" id="profile-dot" hidden></span>
+      </button>
+      <!-- Меню профиля по макету «Мой профиль» (канвас, 29.09) — одинаковое на всех
+           страницах; тексты и счётчики — site-ui.js::initProfile (на app.html —
+           app.js: там «Избранное»/«Скрытые» — переключатели списка). -->
+      <div class="ds-popover profile-menu" id="profile-menu" hidden>
+        <div class="ds-popover__head"><span class="ds-note" id="menu-status" data-i18n="profile_device">Это устройство · без входа</span></div>
+        <div class="ds-popover__body menu-list">
+          <a class="menu-row" id="menu-fav" href="app.html?view=fav"><span data-i18n="menu_fav">Избранное</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row" id="menu-hidden" href="app.html?view=hidden"><span data-i18n="menu_hidden">Скрытые</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row" id="menu-places" href="app.html#places"><span data-i18n="menu_places">Мои места</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row" id="menu-profile" href="profile.html"><span data-i18n="menu_profile">Мой профиль →</span></a>
+        </div>
+        <div class="ds-popover__foot" id="menu-login-foot">
+          <a class="ds-btn ds-btn--link menu-login" href="https://t.me/Flats_Warsaw_Bot" target="_blank" rel="noopener" data-i18n="menu_login">Войти через Telegram</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="la-wrap">
+  <section class="la-hero">
+    <h1 class="la-h1" data-i18n="hero_h1">Продать или сдать квартиру</h1>
+    <p class="la-sub" data-i18n="hero_p">Заполните форму — заявку посмотрит модератор и свяжется с вами. Объявление на сайте автоматически не публикуется.</p>
+  </section>
+
+  <form class="la-form" id="la-form" novalidate>
+    <section class="ds-section">
+      <h3 class="ds-section-label" data-i18n="apt_title">Квартира</h3>
+      <div class="ds-chips" id="la-type" role="group" data-i18n-aria="type_label" aria-label="Что вы хотите сделать">
+        <button type="button" class="chip ds-chip" data-value="sell" data-i18n="type_sell" aria-pressed="true">Продать</button>
+        <button type="button" class="chip ds-chip" data-value="rent" data-i18n="type_rent" aria-pressed="false">Сдать</button>
+      </div>
+      <label class="ds-field"><span data-i18n="address_label">Адрес квартиры</span>
+        <input type="text" id="la-address" class="ds-input" data-i18n-ph="address_ph" placeholder="например, ul. Puławska 10"></label>
+    </section>
+
+    <section class="ds-section">
+      <h3 class="ds-section-label" data-i18n="params_title">Параметры — не обязательно</h3>
+      <div class="ds-fields ds-fields--3">
+        <label class="ds-field"><span data-i18n="price_label">Цена, PLN</span><input type="number" id="la-price" class="ds-input" min="0"></label>
+        <label class="ds-field"><span data-i18n="rooms_label">Комнаты</span><input type="number" id="la-rooms" class="ds-input" min="1" max="20"></label>
+        <label class="ds-field"><span data-i18n="area_label">Площадь, м²</span><input type="number" id="la-area" class="ds-input" min="5" max="1000"></label>
+      </div>
+      <label class="ds-field"><span data-i18n="desc_label">Описание</span>
+        <textarea id="la-description" class="ds-input" maxlength="2000" data-i18n-ph="desc_ph"
+          placeholder="Кратко: состояние, условия продажи или аренды, что важно знать"></textarea></label>
+    </section>
+
+    <section class="ds-section">
+      <h3 class="ds-section-label" data-i18n="contacts_title">Контакты</h3>
+      <label class="ds-field"><span data-i18n="name_label">Как к вам обращаться</span>
+        <input type="text" id="la-name" class="ds-input" data-i18n-ph="name_ph" placeholder="Имя"></label>
+      <div class="ds-fields ds-fields--3">
+        <label class="ds-field"><span data-i18n="phone_label">Телефон</span><input type="tel" id="la-phone" class="ds-input" placeholder="+48 …"></label>
+        <label class="ds-field"><span>Telegram</span><input type="text" id="la-telegram" class="ds-input" placeholder="@username"></label>
+        <label class="ds-field"><span data-i18n="email_label">Email</span><input type="email" id="la-email" class="ds-input" placeholder="you@example.com"></label>
+      </div>
+      <p class="ds-note" data-i18n="contact_hint">Нужен хотя бы один способ связи — телефон, Telegram или email.</p>
+    </section>
+
+    <!-- Honeypot — см. пояснение в <style> выше и в 6.valuate/api.py. -->
+    <div class="la-hp" aria-hidden="true">
+      <label for="la-hp">Оставьте это поле пустым</label>
+      <input type="text" id="la-hp" tabindex="-1" autocomplete="off">
+    </div>
+
+    <div class="la-actions">
+      <span class="la-msg" id="la-msg" role="status" hidden></span>
+      <button type="submit" class="ds-btn ds-btn--primary" id="la-submit" data-i18n="submit_btn">Отправить заявку</button>
+    </div>
+  </form>
+
+  <div class="mkt-foot">
+    <a href="market.html" data-i18n="back_link">← Ко всем квартирам в базе</a>
+  </div>
+</div>
+
+<script src="list-apartment.js?v=202610040158" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Политика загрузки ресурсов. Публичная страница показывает данные из внешних
+     источников (Otodom, Airly) — это вторая линия обороны от XSS, если
+     экранирование где-то пропустят. Разрешено: свои файлы, Leaflet с unpkg,
+     картинки по https (фото Otodom, тайлы Esri, шумовой WMS Варшавы).
+     'unsafe-inline' только для стилей: Leaflet и карточки ставят style="…".
+     connect-src разрешает localhost:5050 (тот же паттерн, что у valuate.html,
+     нужен для локальной разработки/serve.py) и *.trycloudflare.com — эксперимент
+     с Cloudflare Quick Tunnel (2026-09-27, см. COMMUTE_API в app.js): бэкенд
+     6.valuate/api.py временно проброшен на публичный адрес, поддомен меняется
+     при каждом перезапуске туннеля, поэтому wildcard, а не точный адрес — иначе
+     пришлось бы переиздавать сайт при каждой смене поддомена. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https:; connect-src 'self' http://localhost:5050 http://127.0.0.1:5050 https://*.trycloudflare.com; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Warsaw Flats</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="app.css?v=202610040158">
+<link rel="stylesheet" href="ds.css?v=202610040158">
+</head>
+<body data-palette="#2a78d6,#0ca30c,#d03b3b">
+
+<header class="top">
+  <div class="brand">
+    <!-- Ссылка на хаб трёх модулей (homepage.html) — тот же паттерн brand-home,
+         что на homepage/market/valuate/list-apartment (юзер 2026-09-26: раньше
+         вела не туда/сбрасывала фильтры вместо перехода — сброс уже есть
+         отдельной кнопкой «Сбросить всё» в панели фильтров). -->
+    <a class="brand-home" id="brand-home" href="homepage.html"
+       data-i18n-aria="brand_home_a" aria-label="Warsaw Flats — на главную">Warsaw&nbsp;Flats</a>
+  </div>
+  <div class="top-right">
+    <div class="tabs" id="tabs" role="tablist">
+      <button class="tab" id="tab-list" role="tab" aria-selected="true" aria-controls="list"
+              data-i18n="tab_list">Список</button>
+      <button class="tab" id="tab-map" role="tab" aria-selected="false" aria-controls="map-wrap"
+              data-i18n="tab_map">Карта</button>
+    </div>
+    <button id="flt-toggle" class="ghost" aria-expanded="false"
+            aria-controls="filters">Фильтры</button>
+    <button id="collapse" class="ghost" aria-pressed="false" title="Свернуть список"
+            data-i18n-aria="collapse_t">◧</button>
+    <button id="lang" class="ghost" title="Język / Язык">PL</button>
+    <button id="theme" class="ghost" data-i18n-title="theme_t" data-i18n-aria="theme_t"
+            title="Светлая / тёмная тема" aria-pressed="false">◐</button>
+    <!-- Профиль: сюда переехали «Избранное» и «Скрытые» — без выдуманного логина,
+         сайт без аккаунтов, это состояние ЭТОГО браузера (localStorage). -->
+    <div class="profile" id="profile">
+      <button id="profile-btn" class="ghost profile-btn" type="button"
+              aria-haspopup="true" aria-expanded="false" aria-controls="profile-menu"
+              data-i18n-aria="profile_a" aria-label="Профиль: избранное и скрытые">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path>
+        </svg>
+        <span class="profile-dot" id="profile-dot" hidden></span>
+      </button>
+      <!-- Меню профиля по макету «Мой профиль» (канвас, 29.09) — одинаковое на всех
+           страницах; тексты и счётчики — site-ui.js::initProfile (на app.html —
+           app.js: там «Избранное»/«Скрытые» — переключатели списка). -->
+      <div class="ds-popover profile-menu" id="profile-menu" hidden>
+        <div class="ds-popover__head"><span class="ds-note" id="menu-status" data-i18n="profile_device">Это устройство · без входа</span></div>
+        <div class="ds-popover__body menu-list">
+          <button type="button" class="menu-row" id="menu-fav" aria-pressed="false"><span data-i18n="menu_fav">Избранное</span><span class="ds-pill__count menu-badge" hidden>0</span></button>
+          <button type="button" class="menu-row" id="menu-hidden" aria-pressed="false"><span data-i18n="menu_hidden">Скрытые</span><span class="ds-pill__count menu-badge" hidden>0</span></button>
+          <button type="button" class="menu-row" id="menu-places"><span data-i18n="menu_places">Мои места</span><span class="ds-pill__count menu-badge" hidden>0</span></button>
+          <a class="menu-row" id="menu-profile" href="profile.html"><span data-i18n="menu_profile">Мой профиль →</span></a>
+        </div>
+        <div class="ds-popover__foot" id="menu-login-foot">
+          <a class="ds-btn ds-btn--link menu-login" href="https://t.me/Flats_Warsaw_Bot" target="_blank" rel="noopener" data-i18n="menu_login">Войти через Telegram</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Компактная панель фильтров: 3 быстрых пилюли (Цена/Комнаты/Район) с поповерами,
+     «Ещё фильтры N» открывает полную панель секциями, активные фильтры — чипами.
+     .flt-head виден только на телефоне — там панель открывается поверх экрана
+     и ей нужна своя кнопка закрытия; там же вся разметка ниже идёт одной
+     прокручиваемой лентой секций вместо поповеров (см. media-запрос в app.css). -->
+<section class="filters" id="filters">
+  <div class="flt-head">
+    <strong data-i18n="flt">Фильтры</strong>
+    <button id="flt-done" class="ghost" data-i18n="flt_done">Готово</button>
+  </div>
+
+  <div class="flt-bar">
+    <div class="pop">
+      <button type="button" class="pill ds-pill" id="pill-price" aria-haspopup="true" aria-expanded="false" aria-controls="pop-price-box">
+        <span data-i18n="f_price">Цена, тыс.</span><span class="pill-val" id="pill-price-val"></span><span class="pill-car" aria-hidden="true">▾</span>
+      </button>
+      <div class="pop-box" id="pop-price-box" hidden></div>
+    </div>
+    <div class="pop">
+      <button type="button" class="pill ds-pill" id="pill-rooms" aria-haspopup="true" aria-expanded="false" aria-controls="pop-rooms-box">
+        <span data-i18n="f_rooms">Комнаты</span><span class="pill-val" id="pill-rooms-val"></span><span class="pill-car" aria-hidden="true">▾</span>
+      </button>
+      <div class="pop-box" id="pop-rooms-box" hidden></div>
+    </div>
+    <div class="pop">
+      <button type="button" class="pill ds-pill" id="pill-district" aria-haspopup="true" aria-expanded="false" aria-controls="pop-district-box">
+        <span data-i18n="f_district">Район</span><span class="pill-val" id="pill-district-val"></span><span class="pill-car" aria-hidden="true">▾</span>
+      </button>
+      <div class="pop-box pop-box-wide" id="pop-district-box" hidden></div>
+    </div>
+    <div class="pop">
+      <button type="button" class="pill ds-pill" id="pill-work" aria-haspopup="true" aria-expanded="false" aria-controls="pop-work-box">
+        <span data-i18n="f_work">Работа</span><span class="pill-val" id="pill-work-val"></span><span class="pill-car" aria-hidden="true">▾</span>
+      </button>
+      <div class="pop-box pop-box-work" id="pop-work-box" hidden></div>
+    </div>
+    <button type="button" class="pill ds-pill pill-more" id="btn-more" aria-haspopup="true" aria-expanded="false" aria-controls="flt-panel">
+      <span data-i18n="flt_more">Ещё фильтры</span><span class="pill-badge ds-pill__count" id="more-badge" hidden>0</span>
+    </button>
+    <div class="flt-spacer"></div>
+    <button type="button" id="reset" class="reset-link" data-i18n="reset_all">Сбросить всё</button>
+  </div>
+
+  <div class="flt-chips" id="flt-chips" hidden></div>
+
+  <div class="flt-panel ds-popover" id="flt-panel" role="dialog" aria-labelledby="flt-panel-t" hidden>
+    <div class="ds-popover__head flt-panel-head">
+      <span id="flt-panel-t" data-i18n="flt_more">Ещё фильтры</span>
+      <button type="button" class="ds-icon-btn" id="panel-close" data-i18n-aria="close" aria-label="Закрыть">×</button>
+    </div>
+    <div class="flt-panel-body ds-popover__body">
+      <section class="fgrp ds-section" id="fgrp-quick">
+        <h3 class="ds-section-label" data-i18n="fg_quick">Быстрые</h3>
+        <div class="qfield ds-section" id="qf-price">
+          <div class="ds-fields">
+            <label class="ds-field"><span data-i18n="f_price_from">Цена от, тыс.</span><input class="ds-input" type="number" id="f-pmin"></label>
+            <label class="ds-field"><span data-i18n="to">до</span><input class="ds-input" type="number" id="f-pmax"></label>
+          </div>
+        </div>
+        <div class="qfield ds-section" id="qf-rooms">
+          <span class="ds-field" data-i18n="f_rooms">Комнаты</span>
+          <span class="ds-chips" id="f-rooms"></span>
+        </div>
+      </section>
+
+      <section class="fgrp ds-section">
+        <h3 class="ds-section-label" data-i18n="fg_apt">Квартира</h3>
+        <div class="ds-fields">
+          <label class="ds-field"><span data-i18n="f_area_from">Площадь от, м²</span><input class="ds-input" type="number" id="f-amin"></label>
+          <label class="ds-field"><span data-i18n="to">до</span><input class="ds-input" type="number" id="f-amax"></label>
+          <label class="ds-field"><span data-i18n="f_year_from">Год постройки от</span><input class="ds-input" type="number" id="f-ymin"></label>
+          <label class="ds-field"><span data-i18n="to">до</span><input class="ds-input" type="number" id="f-ymax"></label>
+        </div>
+      </section>
+
+      <section class="fgrp ds-section">
+        <h3 class="ds-section-label" data-i18n="fg_seller">Рынок и продавец</h3>
+        <span class="ds-chips" id="f-market"></span>
+        <span class="ds-chips" id="f-seller"></span>
+      </section>
+
+      <section class="fgrp ds-section">
+        <h3 class="ds-section-label" data-i18n="fg_cond">Состояние</h3>
+        <span class="ds-chips" id="f-cond"></span>
+      </section>
+
+      <section class="fgrp ds-section">
+        <h3 class="ds-section-label" data-i18n="fg_rating">Рейтинг места</h3>
+        <div class="ds-fields">
+          <label class="ds-field"><span data-i18n="from">от</span><input class="ds-input" type="number" id="f-smin" min="0" max="100"></label>
+          <label class="ds-field"><span data-i18n="to">до</span><input class="ds-input" type="number" id="f-smax" min="0" max="100"></label>
+        </div>
+        <details class="axf2" id="f-axes">
+          <summary class="axf2-toggle" data-i18n="f_axes">Минимум по осям рейтинга</summary>
+          <div class="axf-box ds-box"></div>
+        </details>
+      </section>
+
+      <section class="fgrp ds-section" id="fgrp-loc">
+        <h3 class="ds-section-label" data-i18n="fg_loc">Локация</h3>
+        <div class="qfield ds-section" id="qf-district">
+          <div class="dist-list" id="f-district"></div>
+        </div>
+        <div class="qfield ds-section" id="qf-commute">
+          <span class="ds-section-label qf-commute-t" data-i18n="fg_work">Время в пути</span>
+          <p class="work-place" id="work-place"></p>
+          <div id="commute-field" class="ds-section">
+            <label class="ds-field"><span data-i18n="f_commute">Не дольше, мин</span>
+              <input class="ds-range" type="range" id="work-range" min="15" max="90" step="5" value="45"></label>
+            <div class="work-scale"><span>15</span><b id="work-range-val">45</b><span>90</span></div>
+            <input type="number" id="f-tmax" min="0" max="120" hidden>
+          </div>
+          <button type="button" class="ds-btn ds-btn--link work-places-link" id="open-places" data-i18n="my_places">Мои места</button>
+          <div class="work-foot">
+            <button type="button" class="ds-btn ds-btn--link" id="work-off" data-i18n="work_off">Выключить</button>
+            <button type="button" class="ds-btn ds-btn--primary" id="work-done" data-i18n="done">Готово</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="fgrp ds-section flt-from-map">
+        <h3 class="ds-section-label" data-i18n="fg_map">С карты</h3>
+        <p class="ds-note" data-i18n="fg_map_note">Фильтр «рядом с остановкой» включается кликом по остановке на карте и показывается чипом над списком.</p>
+      </section>
+    </div>
+    <div class="flt-panel-foot ds-popover__foot">
+      <button type="button" class="ds-btn ds-btn--link" id="panel-reset" data-i18n="reset_panel">Сбросить</button>
+      <button type="button" class="ds-btn ds-btn--primary" id="panel-apply"></button>
+    </div>
+  </div>
+  <div class="ds-overlay flt-overlay" id="flt-overlay" hidden></div>
+</section>
+
+<div class="ds-popover notify-pop" id="notify-pop" role="dialog" aria-labelledby="notify-t" hidden>
+  <div class="ds-popover__head"><span id="notify-t"></span></div>
+  <div class="ds-popover__body">
+    <p class="ds-note" id="notify-lead"></p>
+    <div class="ds-box notify-sum" id="notify-sum"></div>
+    <p class="notify-diff" id="notify-diff" hidden></p>
+    <p class="ds-note" id="notify-note"></p>
+    <p class="ds-note notify-err" id="notify-err" role="alert" hidden></p>
+  </div>
+  <div class="ds-popover__foot">
+    <button type="button" class="ds-btn ds-btn--link" id="notify-sec"></button>
+    <button type="button" class="ds-btn ds-btn--primary" id="notify-main"></button>
+    <a class="ds-btn ds-btn--primary" id="notify-login" href="https://t.me/Flats_Warsaw_Bot"
+       target="_blank" rel="noopener" data-i18n="ntf_login" hidden>Войти через Telegram</a>
+  </div>
+</div>
+<div class="ds-overlay notify-overlay" id="notify-overlay" hidden></div>
+
+<main class="split">
+  <!-- Список результатов: счётчик и сортировка — своей строкой НАД карточками,
+       а не разнесены по общей шапке (счётчик был у логотипа, сортировка —
+       среди PL/темы/профиля; ни то ни другое не по смыслу рядом с самим
+       списком, к которому оба относятся). -->
+  <div class="list-col">
+    <div class="list-head">
+      <span id="count" class="count" aria-live="polite">загрузка…</span>
+      <!-- «Уведомлять»: текущий поиск → фильтры бота (макет — холст «Warsaw Flats —
+           Мои места и профиль», страница «Уведомлять по поиску»). Состояние
+           и окно — app.js, раздел «Уведомлять по этому поиску». -->
+      <button type="button" class="ds-pill notify-pill" id="notify-btn"
+              aria-haspopup="dialog" aria-expanded="false" aria-controls="notify-pop">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span id="notify-btn-t" data-i18n="ntf_btn">Уведомлять</span>
+      </button>
+      <label class="sort">
+        <span data-i18n="sort">Сортировка</span>
+        <select id="sort">
+          <option value="p" data-i18n="s_p">цена ↑</option>
+          <option value="-p" data-i18n="s_pd">цена ↓</option>
+          <option value="-sc" data-i18n="s_sc">рейтинг ↓</option>
+          <option value="ppm" data-i18n="s_ppm">цена за м² ↑</option>
+          <option value="-a" data-i18n="s_a">площадь ↓</option>
+          <option value="-seen" data-i18n="s_new">новизна</option>
+        </select>
+      </label>
+    </div>
+    <!-- «Важно для меня» — не фильтр, а порядок: квартиры, где есть отмеченное,
+         поднимаются выше (как Keyword Sort у Rightmove). Макет — Artifact
+         «Warsaw Flats — Мои места и профиль», экран 1. -->
+    <section class="want ds-section" id="want">
+      <!-- Свёрнуто — одна строка с выбранным; раскрывается по нажатию
+           (вариант «в», решение юзера 29.09: одинаково на MacBook и iPhone) -->
+      <button type="button" class="ds-pill want-toggle" id="want-toggle"
+              aria-expanded="false" aria-controls="want-body">
+        <span class="want-toggle__text"><b id="want-t" data-i18n="want_t">Важно для меня</b>: <span id="want-sum"></span></span>
+        <span class="want-toggle__car" aria-hidden="true">▾</span>
+      </button>
+      <div class="want-body ds-section" id="want-body" hidden>
+        <div class="ds-chips" id="want-chips" role="group" aria-labelledby="want-t"></div>
+        <p class="ds-note" id="want-note"></p>
+      </div>
+    </section>
+    <section class="list" id="list" role="tabpanel" aria-labelledby="tab-list"
+              aria-label="Список квартир" data-i18n-aria="list_a"></section>
+  </div>
+
+  <!-- Разделитель: тянем — меняется ширина списка -->
+  <div class="gutter" id="gutter" role="separator" aria-orientation="vertical"
+       tabindex="0" title="Потяните, чтобы изменить ширину списка"></div>
+
+  <!-- Карта -->
+  <section class="map-wrap" id="map-wrap" role="tabpanel" aria-labelledby="tab-map">
+    <div id="map"></div>
+  </section>
+</main>
+
+<!-- Карточка квартиры: выезжает поверх при выборе -->
+<aside class="sheet" id="sheet" hidden role="dialog" aria-labelledby="sheet-h2">
+  <button class="sheet-close" id="sheet-close" aria-label="Закрыть" data-i18n-aria="close_a">✕</button>
+  <div id="sheet-body"></div>
+</aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- «Мои места» (макет: Artifact «Warsaw Flats — Мои места и профиль», экран 3) -->
+<div class="ds-overlay places-overlay" id="places-overlay" hidden></div>
+<div class="ds-popover places-dlg" id="places-dlg" role="dialog" aria-modal="true" aria-labelledby="places-t" hidden>
+  <div class="ds-popover__head">
+    <span id="places-t" data-i18n="my_places">Мои места</span>
+    <button type="button" class="ds-icon-btn" id="places-close" data-i18n-aria="close" aria-label="Закрыть">×</button>
+  </div>
+  <div class="ds-popover__body">
+    <p class="ds-note" data-i18n="places_intro">Время на общественном транспорте до этих мест видно у каждой квартиры. По первому месту работает фильтр «≤ N мин».</p>
+    <div class="places-list" id="places-list"></div>
+    <section class="ds-box ds-section" id="places-add">
+      <h3 class="ds-section-label" data-i18n="place_add_t">Добавить место</h3>
+      <div class="ds-fields places-fields">
+        <label class="ds-field"><span data-i18n="place_name">Название</span>
+          <input class="ds-input" id="place-name" maxlength="40" data-i18n-ph="place_name_ph" placeholder="Работа, школа…"></label>
+        <label class="ds-field"><span data-i18n="place_addr">Адрес в Варшаве</span>
+          <input class="ds-input" id="place-addr" maxlength="200" data-i18n-ph="place_addr_ph" placeholder="улица и номер дома"></label>
+      </div>
+      <div class="places-add-row">
+        <button type="button" class="ds-btn ds-btn--primary" id="place-add" data-i18n="place_add">Добавить</button>
+        <span class="ds-note" id="place-msg" role="status"></span>
+      </div>
+    </section>
+    <p class="ds-note" data-i18n="places_where">До 3 мест. Хранятся в этом браузере, а если открыть сайт по ссылке из бота (/profile) — в профиле, одинаково на всех устройствах.</p>
+  </div>
+</div>
+<script src="app.js?v=202610040158" type="module"></script>
+</body>
+</html>

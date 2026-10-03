@@ -1,0 +1,226 @@
+/* ds.css — дизайн-система Warsaw Flats: значения и компоненты интерфейса.
+ *
+ * ЕДИНСТВЕННЫЙ источник размеров, скруглений, отступов и компонентов для
+ * новых частей сайта. Из этого же файла собирается дизайн-система в
+ * Artifact («Warsaw Flats UI») и её подключают макеты — поэтому макет и сайт
+ * строятся из одних деталей и не могут разойтись. Проверка:
+ * design_check/check.py сверяет вычисленные стили сайта с этим файлом.
+ *
+ * Цвета поверхностей/текста/акцента (--surface, --plane, --line, --ink*,
+ * --accent*, --good/--bad) определены в app.css со светлой и тёмной темой;
+ * здесь — только то, чего там не было. Классы компонентов — с префиксом ds-,
+ * чтобы не сталкиваться со старыми стилями app.css.
+ */
+
+/* ── Значения ─────────────────────────────────────────────────────────────── */
+:root {
+  --input-bg:    #ffffff;                 /* подложка поля ввода: светлее поверхности */
+  --line-strong: #c9c8c2;                 /* пунктир тега «нет», неактивные рамки */
+  --yes-bg:      #e3efe3;                 /* тег «✓ есть» */
+  --yes-line:    #b9d7b9;
+  --yes-ink:     #0a5c0a;
+  --overlay:     rgba(11, 11, 11, 0.18);  /* затемнение под выпадающим окном */
+  --shadow-pop:  0 12px 32px rgba(11, 11, 11, 0.16);
+
+  --r-pill:    999px;   /* фильтр, чип, тег */
+  --r-control: 8px;     /* поле, кнопка, иконка-кнопка */
+  --r-card:    10px;    /* карточка квартиры, блок внутри */
+  --r-panel:   12px;    /* панель, выпадающее окно, плитка */
+
+  --h-pill:  34px;
+  --h-chip:  30px;
+  --h-input: 36px;
+  --h-btn:   40px;
+  --h-icon:  32px;
+
+  --fs-caption: 12px;    /* заголовок секции, подпись поля, тег */
+  --fs-meta:    12.5px;  /* параметры, вторичный текст, чип */
+  --fs-control: 13px;    /* фильтр */
+  --fs-body:    13.5px;  /* текст, поле, кнопка */
+  --fs-title:   14px;    /* адрес в карточке */
+  --fs-lead:    15px;    /* цена, заголовок окна */
+  --fs-h2:      19px;
+  --fs-h1:      26px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    --input-bg: #121211; --line-strong: #4a4a46;
+    --yes-bg: #13301a; --yes-line: #2a5a34; --yes-ink: #86dd94;
+    --overlay: rgba(0, 0, 0, 0.5);
+    --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.6);
+  }
+}
+:root[data-theme="dark"] {
+  --input-bg: #121211; --line-strong: #4a4a46;
+  --yes-bg: #13301a; --yes-line: #2a5a34; --yes-ink: #86dd94;
+  --overlay: rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Компоненты ───────────────────────────────────────────────────────────── */
+/* @ds-components — всё ниже уходит в дизайн-систему как bundle.css */
+
+.ds-btn {
+  box-sizing: border-box; height: var(--h-btn); padding: 0 16px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid var(--line); border-radius: var(--r-control);
+  background: var(--surface); color: var(--ink);
+  font: inherit; font-size: var(--fs-body); font-weight: 400; line-height: 1;
+  white-space: nowrap; text-decoration: none; cursor: pointer;
+}
+.ds-btn:hover { border-color: var(--ink-3); }
+.ds-btn--primary { background: var(--accent-fill); border-color: var(--accent-fill); color: #ffffff; font-weight: 600; }
+.ds-btn--primary:hover { border-color: var(--accent-fill); filter: brightness(1.08); }
+.ds-btn--link {
+  height: var(--h-btn); padding: 0 4px; border: 0; background: transparent;
+  color: var(--ink-2); text-decoration: underline; font-weight: 400;
+}
+.ds-btn--link:hover { color: var(--ink); }
+.ds-btn:disabled { opacity: .5; cursor: default; }
+
+.ds-icon-btn {
+  box-sizing: border-box; width: var(--h-icon); height: var(--h-icon); padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); border-radius: var(--r-control);
+  background: var(--surface); color: var(--ink-2); font: inherit; font-size: 16px; line-height: 1; cursor: pointer;
+}
+.ds-icon-btn:hover { color: var(--ink); border-color: var(--ink-3); }
+
+.ds-pill {
+  box-sizing: border-box; height: var(--h-pill); padding: 0 14px;
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--surface); color: var(--ink);
+  font: inherit; font-size: var(--fs-control); font-weight: 400; line-height: 1;
+  white-space: nowrap; cursor: pointer;
+}
+.ds-pill:hover { border-color: var(--ink-3); }
+.ds-pill[aria-pressed="true"] { background: var(--accent-fill); border-color: var(--accent-fill); color: #ffffff; }
+.ds-pill[aria-expanded="true"] { border-color: var(--ink); font-weight: 600; }
+.ds-pill[aria-pressed="true"][aria-expanded="true"] { border-color: var(--accent-fill); }
+.ds-pill__value { color: var(--accent-ink); font-weight: 600; }
+.ds-pill[aria-pressed="true"] .ds-pill__value { color: #ffffff; }
+.ds-pill__count {
+  min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--r-pill); background: var(--accent-fill); color: #ffffff;
+  font-size: 11px; font-weight: 700;
+}
+
+.ds-chip {
+  box-sizing: border-box; height: var(--h-chip); padding: 0 12px;
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--surface); color: var(--ink-2);
+  font: inherit; font-size: var(--fs-meta); line-height: 1; white-space: nowrap; cursor: pointer;
+}
+.ds-chip:hover { border-color: var(--ink-3); color: var(--ink); }
+.ds-chip[aria-pressed="true"] { background: var(--accent-fill); border-color: var(--accent-fill); color: #ffffff; }
+.ds-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.ds-tag {
+  display: inline-flex; align-items: center; padding: 2px 8px;
+  border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--surface); color: var(--ink-2);
+  font-size: var(--fs-caption); line-height: 1.4; white-space: nowrap;
+}
+.ds-tag--yes { background: var(--yes-bg); border-color: var(--yes-line); color: var(--yes-ink); }
+.ds-tag--no  { border-style: dashed; border-color: var(--line-strong); color: var(--ink-3); }
+
+.ds-section { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ds-section-label {
+  margin: 0; font-size: var(--fs-caption); font-weight: 600; line-height: 1.3;
+  color: var(--ink-2); letter-spacing: .3px; text-transform: uppercase;
+}
+.ds-note { margin: 0; font-size: var(--fs-caption); line-height: 1.45; color: var(--ink-3); }
+
+.ds-field {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+  font-size: var(--fs-caption); line-height: 1.3; color: var(--ink-2);
+}
+.ds-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+/* input.ds-input: вес выше общих правил полей в app.css (input[type=number]) */
+.ds-input, input.ds-input {
+  box-sizing: border-box; width: 100%; min-width: 0; height: var(--h-input); padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--r-control);
+  background: var(--input-bg); color: var(--ink);
+  font: inherit; font-size: var(--fs-body); line-height: 1;
+}
+input.ds-input::placeholder { color: var(--ink-3); }
+input.ds-input:hover { border-color: var(--ink-3); }
+input.ds-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+
+.ds-check {
+  line-height: 1.4;
+  min-height: var(--h-pill); display: grid; grid-template-columns: 22px 1fr auto;
+  gap: 8px; align-items: center; font-size: var(--fs-body); color: var(--ink); cursor: pointer;
+}
+.ds-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent-fill); }
+.ds-check__n { font-size: var(--fs-caption); color: var(--ink-3); }
+
+.ds-range { width: 100%; margin: 0; accent-color: var(--accent-fill); }
+.ds-range-row {
+  line-height: 1.4;
+  display: grid; grid-template-columns: 130px minmax(0, 1fr) 44px; gap: 10px; align-items: center;
+  font-size: var(--fs-meta); color: var(--ink-2);
+}
+.ds-range-row > :last-child { text-align: right; color: var(--ink); }
+
+.ds-box { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-card); }
+
+.ds-popover {
+  box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--shadow-pop);
+}
+.ds-popover__head {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 14px 16px; border-bottom: 1px solid var(--line);
+  font-size: var(--fs-lead); font-weight: 700;
+}
+.ds-popover__body { padding: 16px; display: flex; flex-direction: column; gap: 18px; overflow: auto; min-height: 0; }
+.ds-popover__foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 12px 16px; border-top: 1px solid var(--line); background: var(--surface);
+}
+.ds-overlay { position: fixed; inset: 0; background: var(--overlay); }
+
+/* Три поля в ряд (цена · комнаты · площадь; телефон · Telegram · email) */
+.ds-fields--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 520px) { .ds-fields--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Многострочное поле и выпадающий список — те же рамка, скругление, подложка */
+textarea.ds-input {
+  height: auto; min-height: 96px; padding: 8px 10px; line-height: 1.45; resize: vertical;
+}
+select.ds-input {
+  appearance: none; -webkit-appearance: none; padding-right: 32px; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+                    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+}
+
+/* Полосы оценок: название · полоса · число (оси рейтинга) */
+.ds-bars {
+  line-height: 1.4;
+  display: grid; grid-template-columns: 130px minmax(0, 1fr) 32px; gap: 8px 10px; align-items: center;
+  font-size: var(--fs-meta); color: var(--ink-2);
+}
+.ds-bars__track { height: 6px; border-radius: 3px; background: var(--accent-soft); overflow: hidden; }
+.ds-bars__fill { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.ds-bars__val { text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* Крупный балл: число и подпись по базовой линии */
+.ds-score { line-height: 1.3; display: flex; align-items: baseline; gap: 10px; }
+.ds-score__num { font-size: 40px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.ds-score__label { font-size: var(--fs-meta); color: var(--ink-2); }
+
+/* Подпись — значение (адрес, координаты, шум) */
+.ds-facts { line-height: 1.4; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: var(--fs-meta); }
+.ds-facts dt { color: var(--ink-3); }
+.ds-facts dd { margin: 0; color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+
+/* Скрытое — скрыто: display у компонентов выше перебивал бы атрибут hidden
+   (29.09: счётчик «0» на «Ещё фильтры», пустые блоки «Работы») */
+[class*="ds-"][hidden] { display: none !important; }
