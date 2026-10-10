@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- CSP как у valuate.html: только своя разметка и JSON своего бэкенда
+     (6.valuate/api.py, /profile). connect-src — localhost для serve.py и
+     *.trycloudflare.com для опубликованного сайта (адрес туннеля меняется). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:5050 http://127.0.0.1:5050 https://*.trycloudflare.com; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Warsaw Flats — мой профиль</title>
+<link rel="stylesheet" href="app.css?v=202610102210">
+<link rel="stylesheet" href="ds.css?v=202610102210">
+<link rel="stylesheet" href="valuate.css?v=202610102210">
+<!-- «Мой профиль» — сборник по макету (канвас «Мой профиль — макет», 29.09):
+     вид — компоненты ds.css, здесь только раскладка страницы. -->
+<style>
+  .pf-wrap { width: 880px; max-width: 100%; margin: 0 auto; padding: 32px 0; box-sizing: border-box;
+             display: flex; flex-direction: column; gap: 16px; }
+  .pf-title { display: flex; flex-direction: column; gap: 4px; }
+  .pf-title h1 { margin: 0; font-size: var(--fs-h1); font-weight: 700; letter-spacing: -.2px; }
+  .pf-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .pf-card { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .pf-card .ds-section-label, .pf-card .ds-note, .pf-block .ds-section-label, .pf-block .ds-note { margin: 0; }
+  .pf-num { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .pf-places { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-title); }
+  .pf-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pf-link.ds-btn { height: auto; padding: 0; color: var(--accent-ink); text-decoration: none; }
+  .pf-block { display: flex; flex-direction: column; gap: 10px; }
+  .pf-search { font-size: var(--fs-title); font-weight: 600; }
+  .pf-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .pf-actions a.ds-btn { text-decoration: none; display: inline-flex; align-items: center; }
+  .pf-tg { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+  .pf-tg > div { display: flex; flex-direction: column; gap: 4px; }
+  .pf-tg-t { font-size: var(--fs-title); font-weight: 600; }
+  .pf-tg .ds-btn { flex-shrink: 0; }
+  .pf-login p { margin: 0; font-size: var(--fs-body); line-height: 1.5; }
+  .pf-login a.ds-btn { text-decoration: none; display: inline-flex; align-items: center; align-self: flex-start; }
+  @media (max-width: 700px) {
+    .pf-wrap { padding: 20px 16px 32px; }
+    .pf-grid { grid-template-columns: minmax(0, 1fr); }
+    .pf-tg { flex-direction: column; align-items: stretch; }
+    .top .count { display: none; }   /* как в макете: на телефоне в шапке только название сайта */
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <a class="brand-home" href="homepage.html">Warsaw&nbsp;Flats</a>
+    <span class="count" data-i18n="pf_header">Мой профиль</span>
+  </div>
+  <div class="top-right">
+    <button id="lang" class="ghost" title="Język / Язык">PL</button>
+    <button id="theme" class="ghost" data-i18n-title="theme_t" data-i18n-aria="theme_t"
+            title="Светлая / тёмная тема" aria-pressed="false">◐</button>
+    <div class="profile" id="profile">
+      <button id="profile-btn" class="ghost profile-btn" type="button"
+              aria-haspopup="true" aria-expanded="false" aria-controls="profile-menu"
+              data-i18n-aria="profile_a" aria-label="Профиль: избранное и скрытые">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path>
+        </svg>
+        <span class="profile-dot" id="profile-dot" hidden></span>
+      </button>
+      <!-- Меню профиля по макету «Мой профиль» (канвас, 29.09) — одинаковое на всех
+           страницах; тексты и счётчики — site-ui.js::initProfile (на app.html —
+           app.js: там «Избранное»/«Скрытые» — переключатели списка). -->
+      <div class="ds-popover profile-menu" id="profile-menu" hidden>
+        <div class="ds-popover__head"><span class="ds-note" id="menu-status" data-i18n="profile_device">Это устройство · без входа</span></div>
+        <div class="ds-popover__body menu-list">
+          <a class="menu-row" id="menu-fav" href="app.html?view=fav"><span data-i18n="menu_fav">Избранное</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row" id="menu-hidden" href="app.html?view=hidden"><span data-i18n="menu_hidden">Скрытые</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row" id="menu-places" href="app.html#places"><span data-i18n="menu_places">Мои места</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row" id="menu-profile" href="profile.html"><span data-i18n="menu_profile">Мой профиль →</span></a>
+          <a class="menu-row menu-row--sub" id="menu-privacy" href="privacy.html"><span data-i18n="menu_privacy">Конфиденциальность</span></a>
+        </div>
+        <div class="ds-popover__foot" id="menu-login-foot">
+          <a class="ds-btn ds-btn--link menu-login" href="https://t.me/Flats_Warsaw_Bot" target="_blank" rel="noopener" data-i18n="menu_login">Войти через Telegram</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="pf-wrap">
+  <div class="pf-title">
+    <h1 data-i18n="pf_h1">Мой профиль</h1>
+    <span class="ds-note" id="pf-status" data-i18n="profile_device">Это устройство · без входа</span>
+  </div>
+
+  <div class="pf-grid">
+    <section class="ds-box pf-card">
+      <h3 class="ds-section-label" data-i18n="menu_fav">Избранное</h3>
+      <span class="pf-num" id="pf-fav">0</span>
+      <p class="ds-note" id="pf-fav-note"></p>
+      <div><a class="ds-btn ds-btn--link pf-link" href="app.html?view=fav" data-i18n="pf_open">Открыть в списке</a></div>
+    </section>
+    <section class="ds-box pf-card">
+      <h3 class="ds-section-label" data-i18n="menu_hidden">Скрытые</h3>
+      <span class="pf-num" id="pf-hidden">0</span>
+      <p class="ds-note" id="pf-hidden-note"></p>
+      <div><a class="ds-btn ds-btn--link pf-link" href="app.html?view=hidden" data-i18n="pf_open">Открыть в списке</a></div>
+    </section>
+    <section class="ds-box pf-card">
+      <h3 class="ds-section-label" data-i18n="menu_places">Мои места</h3>
+      <div class="pf-places" id="pf-places"></div>
+      <p class="ds-note" id="pf-places-note"></p>
+      <div><a class="ds-btn ds-btn--link pf-link" href="app.html#places" data-i18n="pf_edit">Изменить</a></div>
+    </section>
+    <section class="ds-box pf-card">
+      <h3 class="ds-section-label" data-i18n="pf_want">Важно для меня</h3>
+      <div class="pf-tags" id="pf-want"></div>
+      <p class="ds-note" data-i18n="pf_want_note">Квартиры с этим — выше в списке. Меняется прямо над списком.</p>
+      <div><a class="ds-btn ds-btn--link pf-link" href="app.html#want" data-i18n="pf_edit">Изменить</a></div>
+    </section>
+  </div>
+
+  <section class="ds-box pf-block" id="pf-search-box" hidden>
+    <h3 class="ds-section-label" data-i18n="pf_search_t">Мой поиск в боте</h3>
+    <div class="pf-search" id="pf-search"></div>
+    <p class="ds-note" id="pf-notify"></p>
+    <div class="pf-actions">
+      <a class="ds-btn ds-btn--primary" id="pf-search-open" href="app.html" data-i18n="pf_edit_site">Изменить на сайте</a>
+      <a class="ds-btn" href="https://t.me/Flats_Warsaw_Bot" target="_blank" rel="noopener" data-i18n="pf_open_bot">Открыть бота</a>
+    </div>
+    <p class="ds-note" data-i18n="pf_search_note">Поменяйте фильтры над списком и нажмите «Уведомлять» — бот получит новый поиск.</p>
+  </section>
+
+  <section class="ds-box pf-block pf-tg" id="pf-tg" hidden>
+    <div>
+      <span class="pf-tg-t">Telegram</span>
+      <p class="ds-note" data-i18n="pf_tg_note">Профиль привязан к вашему чату с ботом. Избранное и скрытые объединяются с ботом при каждом открытии сайта.</p>
+    </div>
+    <button type="button" class="ds-btn" id="pf-logout" data-i18n="pf_logout">Выйти на этом устройстве</button>
+  </section>
+
+  <section class="ds-box pf-block pf-login" id="pf-login">
+    <h3 class="ds-section-label" data-i18n="menu_login">Войти через Telegram</h3>
+    <p id="pf-login-text"></p>
+    <a class="ds-btn ds-btn--primary" href="https://t.me/Flats_Warsaw_Bot" target="_blank" rel="noopener" data-i18n="pf_open_bot">Открыть бота</a>
+  </section>
+</main>
+
+<script type="module" src="profile.js?v=202610102210"></script>
+</body>
+</html>

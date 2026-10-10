@@ -1,0 +1,50 @@
+/* valuate.css — раскладка страницы «Оценить квартиру». Внешний вид элементов —
+   компоненты дизайн-системы ds.css (ds-field, ds-input, ds-chip, ds-range-row,
+   ds-score, ds-bars, ds-facts, ds-btn); здесь только где что стоит.
+   Эталон — макет «Оценить квартиру» (Artifact «Warsaw Flats — Мои места и
+   профиль», экраны 8–9); сверка — design_check/check.py valuate. */
+
+/* Обычная страница, не «оболочка» app.html с внутренним скроллом */
+html, body { height: auto; min-height: 100%; }
+body { display: block; background: var(--plane); }
+
+.val-wrap {
+  box-sizing: border-box; width: 100%; max-width: 1040px; margin: 0 auto;
+  padding: 40px 20px 0; display: flex; flex-direction: column; gap: 28px;
+}
+.val-hero { display: flex; flex-direction: column; gap: 10px; max-width: 640px; }
+.val-hero h1 { margin: 0; font-size: var(--fs-h1); font-weight: 700; letter-spacing: -.2px; }
+.val-hero p { margin: 0; font-size: var(--fs-body); line-height: 1.55; color: var(--ink-2); }
+
+.val-main { display: grid; grid-template-columns: minmax(0, 440px); gap: 40px; align-items: start; }
+.val-main:has(#v-result:not([hidden])) { grid-template-columns: 440px minmax(0, 1fr); }
+
+.val-form { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.val-axes { display: flex; flex-direction: column; gap: 8px; }
+.val-actions { display: flex; align-items: center; gap: 12px; }
+.val-err { color: var(--bad); font-size: var(--fs-meta); }
+
+.val-result {
+  box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; padding: 20px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel);
+}
+.val-result-title { margin: 0; font-size: var(--fs-h2); font-weight: 600; }
+.val-warn { color: var(--bad); }
+
+.mkt-foot { padding: 24px 0 32px; border-top: 1px solid var(--line); text-align: center; }
+.mkt-foot a { color: var(--ink-2); font-size: 13px; }
+
+.brand-home[href] { text-decoration: none; }
+
+@media (max-width: 760px) {
+  /* app.css на узком экране прячет название и сжимает шапку — это ради
+     вкладок и фильтров app.html; здесь места хватает, шапка как на макете */
+  .top { padding: 10px 16px; }
+  .brand-home { display: inline-block; }
+  .count { font-size: 13px; }
+  .ghost { padding: 5px 10px; }
+  .profile-btn { padding: 0; }
+  .top-right { gap: 10px; }
+  .val-wrap { padding: 24px 16px 0; }
+  .val-main, .val-main:has(#v-result:not([hidden])) { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+}

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Своя, более узкая CSP: страница не показывает внешние картинки/карту
+     Otodom — только форма и JSON-ответ своего бэкенда (6.valuate/api.py).
+     connect-src разрешает localhost:5050 (см. API_BASE в valuate.js, нужен
+     для локальной разработки) и *.trycloudflare.com — эксперимент с
+     Cloudflare Quick Tunnel (2026-09-27): бэкенд временно проброшен наружу,
+     поддомен меняется при перезапуске туннеля, поэтому wildcard, а не
+     точный адрес. Когда появится постоянный сервер/домен — сузить обратно
+     до 'self' + этого домена. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:5050 http://127.0.0.1:5050 https://*.trycloudflare.com; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Warsaw Flats — оценка квартиры</title>
+<link rel="stylesheet" href="app.css?v=202610102210">
+<link rel="stylesheet" href="ds.css?v=202610102210">
+<link rel="stylesheet" href="valuate.css?v=202610102210">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <a class="brand-home" href="market.html">Warsaw&nbsp;Flats</a>
+    <span class="count" data-i18n="val_header_label">Оценка квартиры</span>
+  </div>
+  <div class="top-right">
+    <button id="lang" class="ghost" title="Język / Язык">PL</button>
+    <button id="theme" class="ghost" data-i18n-title="theme_t" data-i18n-aria="theme_t"
+            title="Светлая / тёмная тема" aria-pressed="false">◐</button>
+    <div class="profile" id="profile">
+      <button id="profile-btn" class="ghost profile-btn" type="button"
+              aria-haspopup="true" aria-expanded="false" aria-controls="profile-menu"
+              data-i18n-aria="profile_a" aria-label="Профиль: избранное и скрытые">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path>
+        </svg>
+        <span class="profile-dot" id="profile-dot" hidden></span>
+      </button>
+      <!-- Меню профиля по макету «Мой профиль» (канвас, 29.09) — одинаковое на всех
+           страницах; тексты и счётчики — site-ui.js::initProfile (на app.html —
+           app.js: там «Избранное»/«Скрытые» — переключатели списка). -->
+      <div class="ds-popover profile-menu" id="profile-menu" hidden>
+        <div class="ds-popover__head"><span class="ds-note" id="menu-status" data-i18n="profile_device">Это устройство · без входа</span></div>
+        <div class="ds-popover__body menu-list">
+          <a class="menu-row" id="menu-fav" href="app.html?view=fav"><span data-i18n="menu_fav">Избранное</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row" id="menu-hidden" href="app.html?view=hidden"><span data-i18n="menu_hidden">Скрытые</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row" id="menu-places" href="app.html#places"><span data-i18n="menu_places">Мои места</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row" id="menu-profile" href="profile.html"><span data-i18n="menu_profile">Мой профиль →</span></a>
+          <a class="menu-row menu-row--sub" id="menu-privacy" href="privacy.html"><span data-i18n="menu_privacy">Конфиденциальность</span></a>
+        </div>
+        <div class="ds-popover__foot" id="menu-login-foot">
+          <a class="ds-btn ds-btn--link menu-login" href="https://t.me/Flats_Warsaw_Bot" target="_blank" rel="noopener" data-i18n="menu_login">Войти через Telegram</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="val-wrap">
+  <section class="val-hero">
+    <h1 data-i18n="hero_h1">Оценить квартиру</h1>
+    <p data-i18n="hero_p">Введите адрес и параметры вручную или вставьте ссылку на объявление — поля заполнятся сами. Обязательно только местоположение, остальное можно пропустить.</p>
+  </section>
+  <main class="val-main">
+    <!-- Форма (макет: Artifact «Warsaw Flats — Мои места и профиль», экран 8) -->
+    <form class="val-form" id="v-form" novalidate>
+      <section class="ds-section">
+        <h3 class="ds-section-label" data-i18n="loc_title">Местоположение</h3>
+        <div class="ds-chips" id="loc-mode">
+          <button type="button" class="chip ds-chip" data-mode="address" data-i18n="mode_address" aria-pressed="true">По адресу</button>
+          <button type="button" class="chip ds-chip" data-mode="coords" data-i18n="mode_coords" aria-pressed="false">Координаты</button>
+          <button type="button" class="chip ds-chip" data-mode="link" data-i18n="mode_link" aria-pressed="false">По ссылке</button>
+        </div>
+        <label class="ds-field" id="loc-address"><span data-i18n="addr_label">Адрес в Варшаве</span>
+          <input type="text" id="v-address" class="ds-input" data-i18n-ph="addr_ph" placeholder="например, Prosta 67"></label>
+        <div class="ds-fields" id="loc-coords" hidden>
+          <label class="ds-field">lat<input type="number" id="v-lat" class="ds-input" step="0.0001" placeholder="52.2297"></label>
+          <label class="ds-field">lon<input type="number" id="v-lon" class="ds-input" step="0.0001" placeholder="21.0122"></label>
+        </div>
+        <div class="ds-section" id="loc-link" hidden>
+          <label class="ds-field"><span data-i18n="link_label">Ссылка на объявление</span>
+            <input type="url" id="v-otodom-url" class="ds-input" placeholder="https://www.otodom.pl/pl/oferta/...-IDxxxxx"></label>
+          <p class="ds-note" data-i18n="link_note">Площадь, комнаты, этаж, цена и район подставятся со страницы объявления. Если сейчас автозаполнение недоступно — переключитесь на «По адресу» или «Координаты».</p>
+        </div>
+      </section>
+
+      <section class="ds-section" id="fgrp-apartment">
+        <h3 class="ds-section-label" data-i18n="apt_title">Квартира</h3>
+        <div class="ds-fields">
+          <label class="ds-field"><span data-i18n="area_label">Площадь, м²</span><input type="number" id="v-area" class="ds-input" min="5" max="1000"></label>
+          <label class="ds-field"><span data-i18n="rooms_label">Комнаты</span><input type="number" id="v-rooms" class="ds-input" min="1" max="20"></label>
+          <label class="ds-field"><span data-i18n="floor_label">Этаж</span><input type="number" id="v-floor" class="ds-input" min="-2" max="100"></label>
+          <label class="ds-field"><span data-i18n="total_floors_label">Этажей в доме</span><input type="number" id="v-total-floors" class="ds-input" min="1" max="100"></label>
+          <label class="ds-field"><span data-i18n="year_label">Год постройки</span><input type="number" id="v-year" class="ds-input" min="1800" max="2030"></label>
+          <label class="ds-field"><span data-i18n="price_label">Цена, PLN</span><input type="number" id="v-price" class="ds-input" min="0"></label>
+        </div>
+      </section>
+
+      <section class="ds-section" id="fgrp-categories">
+        <h3 class="ds-section-label" data-i18n="cat_title">Район и тип</h3>
+        <label class="ds-field"><span data-i18n="district_label">Район</span><select id="v-district" class="ds-input"></select></label>
+        <span class="ds-field" data-i18n="market_label">Рынок</span>
+        <span class="ds-chips" id="v-market"></span>
+        <span class="ds-field" data-i18n="seller_label">Продавец</span>
+        <span class="ds-chips" id="v-seller"></span>
+        <span class="ds-field" data-i18n="cond_label">Состояние</span>
+        <span class="ds-chips" id="v-cond"></span>
+      </section>
+
+      <section class="ds-section">
+        <h3 class="ds-section-label"><span data-i18n="axes_title">Что важнее</span><button type="button" class="rh-btn" data-rh="" aria-label="Как считается рейтинг" title="Как считается рейтинг">?</button></h3>
+        <div class="ds-box val-axes" id="v-axes"></div>
+      </section>
+
+      <div class="val-actions">
+        <button type="button" class="ds-btn ds-btn--primary" id="v-submit" data-i18n="submit_default">Оценить</button>
+        <span class="val-err" id="v-err" hidden></span>
+      </div>
+    </form>
+
+    <!-- Результат -->
+    <section class="val-result" id="v-result" hidden></section>
+  </main>
+
+  <div class="mkt-foot">
+    <a href="market.html" data-i18n="back_link">← Ко всем квартирам в базе</a>
+  </div>
+
+</div>
+
+<script src="valuate.js?v=202610102210" type="module"></script>
+</body>
+</html>
