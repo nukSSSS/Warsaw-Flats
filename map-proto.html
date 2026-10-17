@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Карта — прототип MapLibre</title>
+<!-- Прототип векторной карты (17.10.2026): юзер — «карта очень рвано работает,
+     прошлые попытки не исправили; подложку поменять на более информативную».
+     Leaflet + растровые плитки Esri → MapLibre GL + векторные плитки OpenFreeMap
+     (без ключа). Не публикуется (нет в списке publisher.py), пока юзер не решит. -->
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.0/dist/maplibre-gl.css">
+<style>
+  :root { --bg: #f6f6f3; --ink: #1d1d1b; --ink-2: #52514e; --line: #d9d8d2; --accent: #256abf; --surface: #ffffff; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161616; --ink: #ececea; --ink-2: #a9a8a3; --line: #3a3a38; --surface: #222221; } }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  #map { position: absolute; inset: 0; }
+  .bar { position: absolute; z-index: 2; top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right));
+         display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+  .bar button { pointer-events: auto; height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+                font: inherit; font-size: 13px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+  .bar button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .maplibregl-popup-content { font: 13px/1.4 -apple-system, sans-serif; color: #1d1d1b; padding: 10px 12px; border-radius: 10px; }
+  .pp b { font-size: 15px; }
+  .legend { position: absolute; z-index: 2; left: max(10px, env(safe-area-inset-left)); bottom: max(34px, calc(env(safe-area-inset-bottom) + 24px));
+            display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 10px; background: var(--surface); color: var(--ink);
+            font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; opacity: .8; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="bar" id="bar">
+  <button data-style="liberty">Liberty</button>
+  <button data-style="bright+">Bright+</button>
+  <button data-style="bright">Bright</button>
+  <button data-style="positron">Positron</button>
+  <button data-style="dark">Dark</button>
+  <button id="t-lines" aria-pressed="true">Метро и трамвай</button>
+  <button id="t-parks" aria-pressed="true">Зелень</button>
+</div>
+<div class="legend" id="legend">
+  <span><i style="background:#1f7a3a"></i>парк от 2 га</span>
+  <span><i style="background:#e8c34a"></i>сквер</span>
+  <span><i style="background:#3b82c4"></i>спорт</span>
+  <span><i style="background:#d9468a;border-radius:50%"></i>детская площадка</span>
+</div>
+<script type="module">
+import * as ml from "https://unpkg.com/maplibre-gl@6.11.0/dist/maplibre-gl.mjs";
+const maplibregl = ml.default ?? ml;
+const STYLE = (s) => `https://tiles.openfreemap.org/styles/${s.replace("+", "")}`;
+/* Bright+ (17.10.2026 — юзер: Bright информативнее всех, но деталей мало):
+ * значки и подписи на ступень зума раньше, плюс номера домов с 16. */
+function detailBright() {
+  const z = { poi_r1: 14, poi_r7: 15, poi_r20: 16, "highway-name-minor": 14, "highway-name-path": 15 };
+  for (const [id, mz] of Object.entries(z)) if (map.getLayer(id)) map.setLayerZoomRange(id, mz, 24);
+  if (!map.getLayer("housenumber")) map.addLayer({ id: "housenumber", type: "symbol", source: "openmaptiles",
+    "source-layer": "housenumber", minzoom: 16,
+    layout: { "text-field": ["get", "housenumber"], "text-font": ["Noto Sans Regular"], "text-size": 10 },
+    paint: { "text-color": "#8a8580", "text-halo-color": "#ffffff", "text-halo-width": 1 } });
+}
+const q = new URLSearchParams(location.search);
+let cur = q.get("style") || "bright+";
+const map = new maplibregl.Map({
+  container: "map", style: STYLE(cur), center: [+(q.get("lon") || 21.01), +(q.get("lat") || 52.23)], zoom: +(q.get("z") || 11),
+  attributionControl: { compact: true }, maxZoom: 19,
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+
+let apts = null, lines = null, parks = null, linesOn = true, parksOn = true;
+const dataReady = Promise.all([
+  fetch("data/apartments.json").then((r) => r.json()),
+  fetch("data/lines.json").then((r) => r.json()).catch(() => null),
+  fetch("data/parks.json").then((r) => r.json()).catch(() => null),
+]).then(([a, l, pk]) => {
+  parks = pk;
+  apts = { type: "FeatureCollection", features: a.filter((x) => x.lat && x.lon).map((x) => ({
+    type: "Feature", geometry: { type: "Point", coordinates: [x.lon, x.lat] },
+    properties: { sc: x.sc ?? 0, p: x.p, a: x.a, r: x.r, t: [x.d, x.st].filter(Boolean).join(", "), u: x.u } })) };
+  if (l) lines = {
+    type: "FeatureCollection",
+    features: l.routes.flatMap((r) => r.g.map((seg) => ({ type: "Feature", properties: { c: r.c, t: r.t },
+      geometry: { type: "LineString", coordinates: seg.map(([la, lo]) => [lo, la]) } }))),
+  };
+});
+
+/* Свои слои — поверх любой подложки; после смены стиля добавляются заново */
+function addOwn() {
+  if (!apts || map.getSource("apts")) return;
+  if (lines) {
+    map.addSource("lines", { type: "geojson", data: lines });
+    map.addLayer({ id: "lines", type: "line", source: "lines", layout: { visibility: linesOn ? "visible" : "none", "line-join": "round" },
+      paint: { "line-color": ["get", "c"], "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 15, 4], "line-opacity": 0.8 } });
+  }
+  if (parks) {
+    const vis = parksOn ? "visible" : "none";
+    const col = ["match", ["get", "k"], "park", "#1f7a3a", "skwer", "#e8c34a", "#3b82c4"];
+    const poly = ["==", ["geometry-type"], "Polygon"];
+    map.addSource("parks", { type: "geojson", data: parks });
+    map.addLayer({ id: "parks-fill", type: "fill", source: "parks", layout: { visibility: vis }, filter: ["!=", ["get", "k"], "play"],
+      paint: { "fill-color": col, "fill-opacity": 0.45 } });
+    map.addLayer({ id: "parks-line", type: "line", source: "parks", layout: { visibility: vis }, filter: ["!=", ["get", "k"], "play"],
+      paint: { "line-color": col, "line-width": ["match", ["get", "k"], "park", 2, 1] } });
+    map.addLayer({ id: "parks-play", type: "circle", source: "parks", minzoom: 12, layout: { visibility: vis }, filter: ["==", ["get", "k"], "play"],
+      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 2, 16, 5], "circle-color": "#d9468a", "circle-stroke-color": "#fff", "circle-stroke-width": 1 } });
+    map.addLayer({ id: "parks-label", type: "symbol", source: "parks", minzoom: 12.5, filter: ["!=", ["get", "k"], "play"],
+      layout: { visibility: vis, "text-field": ["concat", ["get", "n"], ["case", ["==", ["get", "n"], ""], "", "\n"], ["to-string", ["get", "ha"]], " ha"],
+                "text-size": 11, "text-font": ["Noto Sans Bold"], "text-max-width": 10 },
+      paint: { "text-color": "#123d1f", "text-halo-color": "#ffffff", "text-halo-width": 1.5 } });
+  }
+  map.addSource("apts", { type: "geojson", data: apts });
+  map.addLayer({ id: "apts", type: "circle", source: "apts", paint: {
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 2.5, 13, 5, 16, 8],
+    "circle-color": ["interpolate", ["linear"], ["get", "sc"], 20, "#c03030", 45, "#e0a020", 70, "#087a08"],
+    "circle-stroke-color": "#ffffff", "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 15, 1.5] } });
+}
+map.on("style.load", () => { if (cur === "bright+") detailBright(); dataReady.then(addOwn); });
+map.on("click", "apts", (e) => {
+  const p = e.features[0].properties;
+  new maplibregl.Popup({ offset: 8 }).setLngLat(e.lngLat)
+    .setHTML(`<div class="pp"><b>${Math.round(p.p).toLocaleString("ru-RU")} PLN</b><br>${p.t}<br>${p.a} м² · ${p.r} комн. · рейтинг ${Math.round(p.sc)}</div>`)
+    .addTo(map);
+});
+map.on("mouseenter", "apts", () => (map.getCanvas().style.cursor = "pointer"));
+map.on("mouseleave", "apts", () => (map.getCanvas().style.cursor = ""));
+
+function paintBar() {
+  document.querySelectorAll("[data-style]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.style === cur)));
+}
+document.querySelectorAll("[data-style]").forEach((b) => b.onclick = () => { cur = b.dataset.style; map.setStyle(STYLE(cur)); paintBar(); });
+document.getElementById("t-parks").onclick = (e) => {
+  parksOn = !parksOn; e.currentTarget.setAttribute("aria-pressed", String(parksOn));
+  document.getElementById("legend").hidden = !parksOn;
+  for (const id of ["parks-fill", "parks-line", "parks-play", "parks-label"]) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", parksOn ? "visible" : "none");
+};
+map.on("click", "parks-fill", (e) => {
+  if (map.queryRenderedFeatures(e.point, { layers: ["apts"] }).length) return;
+  const p = e.features[0].properties;
+  const kind = { park: "парк (от 2 га)", skwer: "сквер", sport: "спорт" }[p.k];
+  new maplibregl.Popup({ offset: 4 }).setLngLat(e.lngLat).setHTML(`<div class="pp"><b>${p.n || "без названия"}</b><br>${p.ha} га · ${kind}</div>`).addTo(map);
+});
+document.getElementById("t-lines").onclick = (e) => {
+  linesOn = !linesOn; e.currentTarget.setAttribute("aria-pressed", String(linesOn));
+  if (map.getLayer("lines")) map.setLayoutProperty("lines", "visibility", linesOn ? "visible" : "none");
+};
+paintBar();
+</script>
+</body>
+</html>
