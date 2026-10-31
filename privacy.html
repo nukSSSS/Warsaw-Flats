@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:5050 http://127.0.0.1:5050 https://*.trycloudflare.com; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="description" content="Как Warsaw Flats обращается с данными пользователей.">
+<title>Warsaw Flats — конфиденциальность</title>
+<link rel="stylesheet" href="app.css?v=202610312009">
+<link rel="stylesheet" href="ds.css?v=202610312009">
+<style>
+  /* Страница политики конфиденциальности (10.10.2026): текст в той же оболочке,
+     что «Разместить объявление»; тексты RU/PL — privacy.js. */
+  html, body { height: auto; min-height: 100%; }
+  body { display: block; background: var(--plane); }
+  .pv-wrap { box-sizing: border-box; width: 100%; max-width: 720px; margin: 0 auto;
+             padding: 40px 20px 32px; display: flex; flex-direction: column; gap: 20px; }
+  .pv-h1 { margin: 0; font-size: var(--fs-h1); font-weight: 700; letter-spacing: -.2px; }
+  #pv-body { display: flex; flex-direction: column; gap: 12px; }
+  .pv-card { box-sizing: border-box; padding: 20px; background: var(--surface);
+             border: 1px solid var(--line); border-radius: var(--r-panel);
+             display: flex; flex-direction: column; gap: 10px; }
+  .pv-card h2 { margin: 0; font-size: 16px; font-weight: 600; }
+  .pv-card p, .pv-card li { margin: 0; font-size: var(--fs-body); line-height: 1.55; color: var(--ink-2); }
+  .pv-card ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  .brand-home[href] { text-decoration: none; }
+  @media (max-width: 760px) {
+    .top { padding: 10px 16px; } .brand-home { display: inline-block; }
+    .pv-wrap { padding: 24px 16px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <a class="brand-home" href="homepage.html">Warsaw&nbsp;Flats</a>
+    <span class="count" data-i18n="pv_header">Конфиденциальность</span>
+  </div>
+  <div class="top-right">
+    <button id="lang" class="ghost" title="Język / Язык">PL</button>
+    <button id="theme" class="ghost" data-i18n-title="theme_t" data-i18n-aria="theme_t"
+            title="Светлая / тёмная тема" aria-pressed="false">◐</button>
+    <div class="profile" id="profile">
+      <button id="profile-btn" class="ghost profile-btn" type="button"
+              aria-haspopup="true" aria-expanded="false" aria-controls="profile-menu"
+              data-i18n-aria="profile_a" aria-label="Профиль: избранное и скрытые">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path>
+        </svg>
+        <span class="profile-dot" id="profile-dot" hidden></span>
+      </button>
+      <!-- Меню профиля по макету «Мой профиль» (канвас, 29.09) — одинаковое на всех
+           страницах; тексты и счётчики — site-ui.js::initProfile (на app.html —
+           app.js: там «Избранное»/«Скрытые» — переключатели списка). -->
+      <div class="ds-popover profile-menu" id="profile-menu" hidden>
+        <div class="ds-popover__head"><span class="ds-note" id="menu-status" data-i18n="profile_device">Это устройство · без входа</span></div>
+        <div class="ds-popover__body menu-list">
+          <a class="menu-row" id="menu-profile" href="profile.html"><span data-i18n="menu_profile">Мой профиль</span></a>
+          <a class="menu-row" id="menu-fav" href="app.html?view=fav"><span data-i18n="menu_fav">Избранное</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row" id="menu-hidden" href="app.html?view=hidden"><span data-i18n="menu_hidden">Скрытые</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row" id="menu-places" href="app.html#places"><span data-i18n="menu_places">Мои места</span><span class="ds-pill__count menu-badge" hidden>0</span></a>
+          <a class="menu-row menu-row--sub" id="menu-privacy" href="privacy.html"><span data-i18n="menu_privacy">Конфиденциальность</span></a>
+        </div>
+        <div class="ds-popover__foot" id="menu-login-foot">
+          <a class="ds-btn ds-btn--link menu-login" href="https://t.me/Flats_Warsaw_Bot" target="_blank" rel="noopener" data-i18n="menu_login">Войти через Telegram</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="pv-wrap">
+  <h1 class="pv-h1" data-i18n="pv_h1">Конфиденциальность</h1>
+  <p class="ds-note" data-i18n="pv_date">Действует с 10.10.2026</p>
+  <div id="pv-body"></div>
+</main>
+
+<script src="privacy.js?v=202610312009" type="module"></script>
+</body>
+</html>

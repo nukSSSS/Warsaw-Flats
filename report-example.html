@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Лендинг «зачем» (20.10.2026): отчёт по квартире на обезличенном примере эталонной
+     квартиры (без адреса, фото и точной цены). Без карты и данных — CSP как у market.html. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:5050 http://127.0.0.1:5050 https://*.trycloudflare.com; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="description" content="Отчёт по квартире в Варшаве: реальные сделки рядом, полная стоимость покупки и с какой суммы начать торг. Бесплатно, в Telegram.">
+<title>Warsaw Flats — отчёт по квартире</title>
+<link rel="stylesheet" href="app.css?v=202610312009">
+<link rel="stylesheet" href="ds.css?v=202610312009">
+<style>
+  /* Обычная длинная страница поверх «оболочки приложения» app.css (как market.html) */
+  html, body { height: auto; min-height: 100%; }
+  body { display: block; }
+  .why { max-width: 880px; margin: 0 auto; padding: 0 20px 64px; }
+  .why-hero { padding: 56px 0 32px; text-align: center; }
+  .why-hero h1 { font-size: 30px; line-height: 1.25; margin: 0 0 14px; letter-spacing: -.3px; text-wrap: balance; }
+  .why-hero p { font-size: 16px; color: var(--ink-2); line-height: 1.55; max-width: 600px; margin: 0 auto 26px; }
+  .why-cta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .why-cta a { text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 22px; font-size: 15px; }
+  .why-cta .ghost-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; }
+  .why-cta .ghost-btn:hover { border-color: var(--ink-3); }
+  .why-sec { padding: 36px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 16px; }
+  .why-sec h2 { font-size: 22px; margin: 0; line-height: 1.3; }
+  .why-lead { margin: 0; font-size: 15px; color: var(--ink-2); line-height: 1.55; max-width: 680px; }
+  .why-flat { display: flex; flex-wrap: wrap; gap: 6px; }
+  .why-flat span { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: var(--plane); border: 1px solid var(--line); color: var(--ink-2); }
+  .why-boxes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .why-box { padding: 16px 18px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; gap: 6px; }
+  .why-box .lbl { font-size: 12px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-2); }
+  .why-box b { font-size: 19px; line-height: 1.3; }
+  .why-box b.bad { color: var(--bad, #c0392b); }
+  .why-box b.good { color: var(--good, #1e7d32); }
+  .why-box span { font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+  .why-panel { padding: 18px 20px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); }
+  .why-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; table-layout: fixed; }
+  .why-table th:first-child { width: 46%; }
+  .why-table th, .why-table td { padding: 9px 0; border-bottom: 1px solid var(--line); text-align: right; vertical-align: top; font-size: 14.5px; }
+  .why-table th:first-child, .why-table td:first-child { text-align: left; padding-right: 12px; }
+  .why-table th { font-size: 12px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; color: var(--ink-2); padding-top: 0; }
+  .why-table tr:last-child td { border-bottom: 0; }
+  .why-table .tot td { font-weight: 700; }
+  .why-table .sub { display: block; font-size: 12.5px; color: var(--ink-2); font-weight: 400; }
+  .why-args { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.45; }
+  .why-plan { padding: 16px 18px; border-radius: var(--radius); background: var(--yes-bg, #eef7ee); border: 1px solid var(--yes-line, #cfe6cf); display: flex; flex-direction: column; gap: 4px; }
+  .why-plan strong { font-size: 17px; line-height: 1.35; }
+  .why-plan span { font-size: 13.5px; color: var(--ink-2); }
+  .why-note { margin: 0; font-size: 12.5px; color: var(--ink-3, var(--ink-2)); line-height: 1.5; }
+  .why-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .why-item { padding: 16px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); }
+  .why-item h3 { margin: 0 0 6px; font-size: 15px; }
+  .why-item p { margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+  .why-steps { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; counter-reset: s; }
+  .why-steps li { padding: 16px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); font-size: 14px; line-height: 1.5; counter-increment: s; }
+  .why-steps li::before { content: counter(s); display: flex; width: 26px; height: 26px; border-radius: 50%; align-items: center; justify-content: center; background: var(--accent); color: #fff; font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+  .why-foot { text-align: center; padding-top: 28px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 14px; align-items: center; }
+  .why-foot p { margin: 0; font-size: 13px; color: var(--ink-2); }
+  @media (max-width: 720px) {
+    .why-hero { padding-top: 36px; }
+    .why-hero h1 { font-size: 24px; }
+    .why-boxes, .why-grid, .why-steps { grid-template-columns: 1fr; }
+    .why-table th, .why-table td { font-size: 13.5px; }
+    .why-table th:first-child { width: 42%; }
+    .why-table th { font-size: 11px; letter-spacing: .2px; }
+  }
+</style>
+</head>
+<body data-palette="#2a78d6,#0ca30c,#d03b3b">
+<header class="top">
+  <div class="brand">
+    <a href="homepage.html" class="brand-home" style="text-decoration:none;display:inline-block;">Warsaw&nbsp;Flats</a>
+  </div>
+  <div class="top-right">
+    <button id="lang" class="ghost" title="Język / Язык">PL</button>
+    <button id="theme" class="ghost" data-i18n-title="theme_t" data-i18n-aria="theme_t"
+            title="Светлая / тёмная тема" aria-pressed="false">◐</button>
+  </div>
+</header>
+<main class="why">
+  <section class="why-hero">
+    <h1 data-i18n="h1">Сколько на самом деле стоит квартира, которую вы смотрите?</h1>
+    <p data-i18n="hero_p">Пришлите ссылку на объявление — получите отчёт: за сколько реально продают похожие квартиры рядом, во что обойдётся покупка целиком и с какой суммы начать торг. Бесплатно, в Telegram, за несколько секунд.</p>
+    <div class="why-cta">
+      <a class="btn-primary" href="https://t.me/Flats_Warsaw_Bot?start=web_why" target="_blank" rel="noopener" data-i18n="cta_bot">Получить отчёт в Telegram</a>
+      <a class="ghost-btn" href="app.html" data-i18n="cta_site">Смотреть квартиры</a>
+    </div>
+  </section>
+
+  <section class="why-sec">
+    <h2 data-i18n="ex_h2">Пример: реальная квартира, адрес скрыт</h2>
+    <div class="why-flat">
+      <span data-i18n="ex_t1">4 комнаты</span><span data-i18n="ex_t2">около 62 м²</span><span data-i18n="ex_t3">первый этаж со своим садом</span>
+      <span data-i18n="ex_t4">новый дом</span><span data-i18n="ex_t5">север Варшавы</span><span data-i18n="ex_t6">продаёт хозяин</span>
+      <span data-i18n="ex_t7">в объявлении ≈ 1,05 млн zł</span>
+    </div>
+    <div class="why-boxes">
+      <div class="why-box"><span class="lbl" data-i18n="b1_l">Цена</span><b class="bad" data-i18n="b1_v">на 16% дороже сделок рядом</b><span data-i18n="b1_s">по нотариальным актам похожих квартир за последний год</span></div>
+      <div class="why-box"><span class="lbl" data-i18n="b2_l">Торг</span><b class="good" data-i18n="b2_v">есть куда</b><span data-i18n="b2_s">почти 3 месяца в продаже, цену снижали 3 раза</span></div>
+      <div class="why-box"><span class="lbl" data-i18n="b3_l">С чего начать</span><b data-i18n="b3_v">≈ 950 тыс. zł</b><span data-i18n="b3_s">цель — около 980 тыс.: это −70 тыс. к цене объявления</span></div>
+    </div>
+
+    <div class="why-plan"><strong data-i18n="plan_t">В этом же доме похожие квартиры продавали по ≈ 15 250 zł/м² — это ≈ 950 тыс. за такую площадь, а не 1,05 млн.</strong><span data-i18n="plan_s">Этого не видно ни в объявлении, ни на портале: цифра — из реестра сделок (RCN), по нотариальным актам.</span></div>
+
+    <h2 data-i18n="args_h">Доводы для торга из отчёта</h2>
+    <ol class="why-args">
+      <li data-i18n="a1">Сделки в этом доме — ≈ 950 тыс. за такую площадь.</li>
+      <li data-i18n="a2">Квартира на 16% дороже похожих сделок рядом.</li>
+      <li data-i18n="a3">В продаже почти 3 месяца; за это время цену снизили трижды, всего на 140 тыс.</li>
+    </ol>
+
+    <h2 data-i18n="cost_h">Полная стоимость покупки</h2>
+    <div class="why-panel">
+      <table class="why-table">
+        <thead><tr><th></th><th data-i18n="c_col1">По цене объявления</th><th data-i18n="c_col2">Если сторгуетесь до 980 тыс.</th></tr></thead>
+        <tbody>
+          <tr><td data-i18n="c_flat">Квартира</td><td>≈ 1 050 000</td><td>980 000</td></tr>
+          <tr><td><span data-i18n="c_pcc">Налог на покупку (PCC) 2%</span><span class="sub" data-i18n="c_pcc_s">0 — если это ваше первое жильё</span></td><td>21 000</td><td>19 600</td></tr>
+          <tr><td data-i18n="c_fees">Нотариус, суд, банк</td><td>≈ 7 800</td><td>≈ 7 600</td></tr>
+          <tr><td><span data-i18n="c_comm">Комиссия агентства</span><span class="sub" data-i18n="c_comm_s">продаёт хозяин</span></td><td data-i18n="c_none">нет</td><td data-i18n="c_none">нет</td></tr>
+          <tr class="tot"><td data-i18n="c_total">Итого</td><td>≈ 1 079 000</td><td>≈ 1 007 000</td></tr>
+          <tr><td><span data-i18n="c_park">Место в гараже</span><span class="sub" data-i18n="c_park_s">продаётся отдельно — цена из объявления</span></td><td>+ 50 000</td><td>+ 50 000</td></tr>
+          <tr><td><span data-i18n="c_cash">Нужно своих денег при взносе 10%</span><span class="sub" data-i18n="c_cash_s">взнос + налог, нотариус, суд, банк</span></td><td>≈ 134 000</td><td>≈ 125 000</td></tr>
+          <tr><td><span data-i18n="c_month">Платёж в месяц при взносе 20%</span><span class="sub" data-i18n="c_month_s">кредит 6,5%, 30 лет + czynsz 950 zł</span></td><td>≈ 6 250</td><td>≈ 5 900</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="why-note" data-i18n="ex_note">Пример — настоящий отчёт по квартире из базы; адрес, фото и точные данные объявления скрыты. Суммы округлены.</p>
+  </section>
+
+  <section class="why-sec">
+    <h2 data-i18n="what_h">Что ещё есть в отчёте</h2>
+    <div class="why-grid">
+      <div class="why-item"><h3 data-i18n="w1_h">Сделки, а не объявления</h3><p data-i18n="w1_p">Цены по нотариальным актам: похожие квартиры рядом и в этом доме — по годам с 2006.</p></div>
+      <div class="why-item"><h3 data-i18n="w2_h">Вся стоимость покупки</h3><p data-i18n="w2_p">Налог, нотариус, суд, банк, комиссия агентства, место в гараже, первый взнос и платёж в месяц.</p></div>
+      <div class="why-item"><h3 data-i18n="w3_h">План торга</h3><p data-i18n="w3_p">С какой суммы начать, до какой цели идти, доводы и сильные стороны — ваши и продавца.</p></div>
+      <div class="why-item"><h3 data-i18n="w4_h">Окружение</h3><p data-i18n="w4_p">Сколько идти до остановки, школы и магазина по улицам, парк, шум, что мешает рядом.</p></div>
+      <div class="why-item"><h3 data-i18n="w5_h">Вопросы продавцу</h3><p data-i18n="w5_p">Чего нет в объявлении — czynsz, отопление, комиссия — списком вопросов на просмотр.</p></div>
+      <div class="why-item"><h3 data-i18n="w6_h">Что проверить на просмотре</h3><p data-i18n="w6_p">Короткий чек-лист: свет, сырость, шум, общие части дома.</p></div>
+    </div>
+  </section>
+
+  <section class="why-sec">
+    <h2 data-i18n="how_h">Как получить</h2>
+    <ol class="why-steps">
+      <li data-i18n="s1">Найдите квартиру на otodom.pl и скопируйте ссылку на объявление.</li>
+      <li data-i18n="s2">Отправьте её боту @Flats_Warsaw_Bot в Telegram — в любой момент, без регистрации.</li>
+      <li data-i18n="s3">Через несколько секунд придёт итог отчёта и кнопка «Открыть отчёт». Его можно сохранить в PDF.</li>
+    </ol>
+    <p class="why-lead" data-i18n="how_site">Или откройте любую квартиру на сайте и нажмите «Отчёт» внизу карточки. Отчёт можно получить по любому объявлению Otodom и по адресу — для квартиры без объявления (в боте «Отчёт по адресу» или «Оценить квартиру» на сайте).</p>
+  </section>
+
+  <section class="why-sec">
+    <h2 data-i18n="src_h">Откуда цифры</h2>
+    <p class="why-lead" data-i18n="src_p">Сделки — из государственного реестра цен (RCN, нотариальные акты). Объявления — с крупнейшего портала, без повторов одной квартиры у разных агентств. Расстояния — пешком по улицам по картам OpenStreetMap. Это анализ открытых данных, а не оценка rzeczoznawcy: точные суммы налога, нотариуса и кредита назовут нотариус и банк.</p>
+  </section>
+
+  <footer class="why-foot">
+    <div class="why-cta">
+      <a class="btn-primary" href="https://t.me/Flats_Warsaw_Bot?start=web_why" target="_blank" rel="noopener" data-i18n="cta_bot">Получить отчёт в Telegram</a>
+      <a class="ghost-btn" href="app.html" data-i18n="cta_site">Смотреть квартиры</a>
+    </div>
+    <p><a href="privacy.html" data-i18n="privacy">Конфиденциальность</a></p>
+  </footer>
+</main>
+<script src="report-example.js?v=202610312009" type="module"></script>
+</body>
+</html>
